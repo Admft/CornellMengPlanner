@@ -1413,6 +1413,55 @@ input[type='range'].cr-range::-moz-range-thumb {
   color: var(--text2);
 }
 
+.req-error-wrap {
+  margin-bottom: 4px;
+}
+
+.req-setup {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: #f8f8f6;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.55;
+}
+
+.req-setup strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.req-setup ul {
+  margin: 8px 0 0 18px;
+}
+
+.req-setup code {
+  font-size: 12px;
+  background: #eee;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.req-setup-cmd {
+  background: #1a1a1a;
+  color: #e8e8e8;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.req-setup-or {
+  margin-top: 10px;
+}
+
+.req-setup a {
+  color: var(--red);
+}
+
 @media (max-width: 560px) {
   .req-grid {
     grid-template-columns: 1fr;

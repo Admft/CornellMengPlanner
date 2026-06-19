@@ -179,7 +179,35 @@ export function FeatureRequestModal({ open, onClose }: FeatureRequestModalProps)
               )}
             </div>
 
-            {error && <div className="val-msg show">⚠ {error}</div>}
+            {error && (
+              <div className="req-error-wrap">
+                <div className="val-msg show">⚠ {error}</div>
+                {error.toLowerCase().includes('not configured') && (
+                  <div className="req-setup">
+                    <strong>One-time setup (pick one)</strong>
+                    <p>
+                      Run in your project folder, then restart <code>npm run dev</code>:
+                    </p>
+                    <pre className="req-setup-cmd">npm run setup:email</pre>
+                    <p className="req-setup-or">Or edit <code>.env</code> manually:</p>
+                    <ul>
+                      <li>
+                        <strong>Gmail:</strong> set <code>SMTP_USER</code> and{' '}
+                        <code>SMTP_PASS</code> (Google App Password — not your normal
+                        password)
+                      </li>
+                      <li>
+                        <strong>Resend (Vercel):</strong> set <code>RESEND_API_KEY</code>{' '}
+                        from{' '}
+                        <a href="https://resend.com" target="_blank" rel="noreferrer">
+                          resend.com
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="req-actions">
               <button type="button" className="btn btn-ghost" onClick={handleClose}>

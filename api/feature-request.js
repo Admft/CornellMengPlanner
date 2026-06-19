@@ -6,6 +6,7 @@ import {
   MAX_FILE_BYTES,
   MAX_FILES,
   sendFeatureRequestEmail,
+  smtpAuthHint,
 } from '../server/featureRequestCore.js'
 
 export default async function handler(req, res) {
@@ -57,10 +58,10 @@ export default async function handler(req, res) {
       })
       return
     }
-    if (error.code === 'EAUTH' || error.code === 'ESOCKET') {
+    if (error.code === 'EAUTH' || error.code === 'ESOCKET' || error.responseCode === 535) {
       res.status(503).json({
         ok: false,
-        error: 'Email server login failed. Check SMTP credentials.',
+        error: error.message || smtpAuthHint() || 'Email server login failed.',
       })
       return
     }

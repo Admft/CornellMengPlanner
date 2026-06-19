@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "node server/index.js",
+    "setup:email": "node scripts/setup-email.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "start": "NODE_ENV=production node server/index.js"
@@ -19,7 +20,8 @@
     "multer": "^2.0.1",
     "nodemailer": "^7.0.3",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "resend": "^4.5.1"
   },
   "devDependencies": {
     "@types/react": "^19.1.2",

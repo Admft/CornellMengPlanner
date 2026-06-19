@@ -5,6 +5,7 @@ import {
   MAX_FILE_BYTES,
   MAX_FILES,
   sendFeatureRequestEmail,
+  smtpAuthHint,
 } from './featureRequestCore.js'
 
 async function handleFeatureRequest(req, res) {
@@ -59,10 +60,9 @@ async function handleFeatureRequest(req, res) {
     } else if (error.httpCode === 413 || error.message?.includes('maxFileSize')) {
       status = 413
       message = 'Attachments are too large. Keep total upload under 4 MB.'
-    } else if (error.code === 'EAUTH' || error.code === 'ESOCKET') {
+    } else if (error.code === 'EAUTH' || error.code === 'ESOCKET' || error.responseCode === 535) {
       status = 503
-      message =
-        'Email server login failed. Check SMTP_USER and SMTP_PASS in your .env file.'
+      message = error.message || smtpAuthHint() || 'Email server login failed.'
     } else {
       console.error('Feature request failed:', error)
     }

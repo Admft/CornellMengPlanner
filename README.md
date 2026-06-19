@@ -6,7 +6,7 @@ Cornell MEM M.Eng. Management course planner — build a personalized semester-b
 
 ```bash
 npm install
-cp .env.example .env   # then add SMTP credentials (see below)
+cp .env.example .env   # then add mail credentials (see below)
 npm run dev
 ```
 
@@ -14,15 +14,20 @@ Open the URL shown in the terminal (usually `http://localhost:5173`). The reques
 
 ### Feature requests (email)
 
-The **Request a change** button sends email through a server-side API. Recipient addresses live only in `.env` on the server — they are never included in the frontend bundle.
+**Quick setup:**
 
-Set these in `.env`:
+```bash
+npm run setup:email
+```
 
-- `FEATURE_REQUEST_RECIPIENTS` — comma-separated inbox addresses
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` — mail server (Gmail app password works)
-- `SMTP_FROM` — optional From header
+Then restart `npm run dev`. The script writes Gmail SMTP or Resend credentials into `.env` (never committed to git).
 
-Until SMTP is configured, the form returns a clear setup message instead of a generic error.
+**Manual setup** — add one of these to `.env`:
+
+- **Gmail:** `SMTP_USER` + `SMTP_PASS` (Google [App Password](https://myaccount.google.com/apppasswords), not your normal password)
+- **Resend (Vercel):** `RESEND_API_KEY` from [resend.com](https://resend.com)
+
+Also set `FEATURE_REQUEST_RECIPIENTS` (comma-separated). Recipient addresses live only in server env — never in the frontend.
 
 Production (self-hosted): run `npm run build && npm start` to serve the app and API together on one port.
 
