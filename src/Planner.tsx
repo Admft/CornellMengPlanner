@@ -604,7 +604,7 @@ export default function Planner() {
                   </select>
                   <span className="hint">
                     Only for the official proposal form&apos;s &quot;Starting&quot; field.
-                    Includes past semesters (2020 onward) if you started earlier. Leave
+                    Includes past semesters back to Spring 2024. Leave
                     blank if you&apos;re just planning ahead.
                   </span>
                 </div>

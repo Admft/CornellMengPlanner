@@ -2,6 +2,8 @@ import type { Semester } from '../types'
 
 const SEM_FIRST_YEAR = 2020
 const SEM_LAST_YEAR = 2032
+/** Earliest semester in the program-start dropdown (Excel export). */
+const PROGRAM_START_FIRST_CODE = 'SP24'
 
 export const SEMS: Semester[] = (() => {
   const result: Semester[] = []
@@ -45,10 +47,14 @@ export function relevantSemesters(): Semester[] {
   )
 }
 
-/** All semesters for program-start date (includes past years). */
+/** Semesters for program-start date (Excel export) — Spring 2024 onward. */
 export function programStartSemesters(): Semester[] {
+  const startIdx = semIdx(PROGRAM_START_FIRST_CODE)
+  if (startIdx < 0) return relevantSemesters()
   return SEMS.filter(
-    (semester) => semester.year >= SEM_FIRST_YEAR && semester.year <= SEM_LAST_YEAR,
+    (semester) =>
+      semester.year <= SEM_LAST_YEAR &&
+      semIdx(semester.code) >= startIdx,
   )
 }
 
