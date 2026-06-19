@@ -1,6 +1,13 @@
-import { EL, OB, PD1, PD2, REQ, RES2, getCourseById } from '../data/courses'
+import {
+  catalogToList,
+  getCourseById,
+  hasWorkshopsDone,
+  isCourseCompleted,
+  prereqsSatisfied,
+} from '../data/courses'
+import { LEGACY_COURSES } from '../data/legacyCourses'
 import { semRange } from '../data/semesters'
-import type { Course, GeneratedPlan, PlannerState, SemesterPlan } from '../types'
+import type { Course, CurriculumCatalog, GeneratedPlan, PlannerState, SemesterPlan } from '../types'
 
 export interface CoursePlacement {
   course: Course
@@ -8,29 +15,38 @@ export interface CoursePlacement {
   semIndex: number
 }
 
+function allKnownCourses(catalog: CurriculumCatalog): Course[] {
+  return [...catalogToList(catalog), ...LEGACY_COURSES]
+}
+
+function resolveCourse(id: string, catalog: CurriculumCatalog): Course | undefined {
+  return getCourseById(id, catalog) ?? LEGACY_COURSES.find((c) => c.id === id)
+}
+
 function buildQueue(state: PlannerState): Course[] {
+  const { curriculum } = state
   const done = new Set(state.taken)
   const queue: Course[] = []
 
-  REQ.forEach((course) => {
-    if (!done.has(course.id)) queue.push({ ...course })
+  curriculum.req.forEach((course) => {
+    if (!isCourseCompleted(course.id, done)) queue.push({ ...course })
   })
 
   if (state.resChoice === 'session2') {
-    if (!done.has('EN6002')) queue.push({ ...RES2 })
+    if (!isCourseCompleted(curriculum.res2.id, done)) queue.push({ ...curriculum.res2 })
   } else {
-    if (!done.has('EN6011')) queue.push({ ...PD1 })
-    if (!done.has('EN6012')) queue.push({ ...PD2 })
+    if (!isCourseCompleted(curriculum.pd1.id, done)) queue.push({ ...curriculum.pd1 })
+    if (!isCourseCompleted(curriculum.pd2.id, done)) queue.push({ ...curriculum.pd2 })
   }
 
-  if (state.obChoice && !done.has(state.obChoice)) {
-    const ob = OB.find((course) => course.id === state.obChoice)
+  if (state.obChoice && !isCourseCompleted(state.obChoice, done)) {
+    const ob = curriculum.ob.find((course) => course.id === state.obChoice)
     if (ob) queue.push({ ...ob })
   }
 
   state.elChoices.forEach((courseId) => {
-    if (!done.has(courseId)) {
-      const elective = EL.find((course) => course.id === courseId)
+    if (!isCourseCompleted(courseId, done)) {
+      const elective = curriculum.el.find((course) => course.id === courseId)
       if (elective) queue.push({ ...elective })
     }
   })
@@ -58,7 +74,7 @@ export function generatePlan(state: PlannerState): GeneratedPlan {
     const available = queue.filter(
       (course) =>
         course.seasons.includes(sem.season) &&
-        (course.prereqs ?? []).every((prereq) => done.has(prereq)),
+        prereqsSatisfied(course.prereqs ?? [], done),
     )
 
     let used = 0
@@ -93,16 +109,14 @@ export function getAllPlacements(state: PlannerState): CoursePlacement[] {
   }
 
   const takenCourses = [...state.taken]
-    .map((id) => getCourseById(id))
+    .map((id) => resolveCourse(id, state.curriculum))
     .filter((course): course is Course => !!course)
     .sort((a, b) => a.pri - b.pri)
 
   for (const course of takenCourses) {
     const semIndex = sems.findIndex((sem) => {
       if (!course.seasons.includes(sem.season)) return false
-      if (!(course.prereqs ?? []).every((prereq) => done.has(prereq) || state.taken.has(prereq))) {
-        return false
-      }
+      if (!prereqsSatisfied(course.prereqs ?? [], done)) return false
       const load = semLoads.get(sem.code) ?? 0
       const limit = limits[sem.season] ?? 12
       return load + course.credits <= limit
@@ -136,9 +150,11 @@ export function getAllPlacements(state: PlannerState): CoursePlacement[] {
 export function getCreditTotals(state: PlannerState) {
   const { plan, unscheduled } = generatePlan(state)
   const takenCredits = [...state.taken].reduce((sum, id) => {
-    const course = getCourseById(id)
+    const course = resolveCourse(id, state.curriculum)
     return sum + (course?.credits ?? 0)
   }, 0)
+
+  const customCredits = state.customTaken.reduce((sum, c) => sum + c.credits, 0)
 
   const plannedCredits = Object.values(plan).reduce(
     (sum, semester) => sum + semester.cr,
@@ -146,9 +162,11 @@ export function getCreditTotals(state: PlannerState) {
   )
 
   return {
-    takenCredits,
+    takenCredits: takenCredits + customCredits,
     plannedCredits,
-    total: takenCredits + plannedCredits,
+    total: takenCredits + customCredits + plannedCredits,
     unscheduled,
   }
 }
+
+export { hasWorkshopsDone, allKnownCourses, resolveCourse }

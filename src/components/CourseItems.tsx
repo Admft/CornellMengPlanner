@@ -40,6 +40,7 @@ export function CourseListItem({
         />
         <span className="ci-code">{course.code}</span>
         <span className="ci-name">{course.name}</span>
+        {course.legacy && <span className="legacy-pill">previous curriculum</span>}
         {hasPrereqs && <span className="prereq-pill">prereqs req.</span>}
         <span className="ci-season">{course.seasons.join(' / ')}</span>
         <span className="ci-cr">{course.credits} cr</span>

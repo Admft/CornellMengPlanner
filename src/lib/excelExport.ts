@@ -1,17 +1,11 @@
 import ExcelJS from 'exceljs'
-import { getCourseById } from '../data/courses'
+import { catalogToList } from '../data/courses'
 import { getAllPlacements } from './planEngine'
 import type { PlannerState } from '../types'
 import { SEM_COLS as COLS } from '../types'
 
-const COURSE_ROWS = [
-  13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-  27, 28, 29, 30,
-  34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
-] as const
-
-function resolveExcelRow(courseId: string): number | undefined {
-  const course = getCourseById(courseId)
+function resolveExcelRow(state: PlannerState, courseId: string): number | undefined {
+  const course = catalogToList(state.curriculum).find((c) => c.id === courseId)
   return course?.excelRow
 }
 
@@ -27,14 +21,21 @@ function downloadBuffer(buffer: ArrayBuffer, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-export async function exportProposalExcel(state: PlannerState) {
-  const response = await fetch('/Cornellproposal.xlsx')
-  if (!response.ok) {
-    throw new Error('Could not load proposal template.')
+export async function exportProposalExcel(
+  state: PlannerState,
+  templateBuffer?: ArrayBuffer | null,
+) {
+  let buffer = templateBuffer
+  if (!buffer) {
+    const response = await fetch('/Cornellproposal.xlsx')
+    if (!response.ok) {
+      throw new Error('Could not load proposal template.')
+    }
+    buffer = await response.arrayBuffer()
   }
 
   const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.load(await response.arrayBuffer())
+  await workbook.xlsx.load(buffer)
   const sheet = workbook.worksheets[0]
   if (!sheet) throw new Error('Template worksheet missing.')
 
@@ -45,7 +46,11 @@ export async function exportProposalExcel(state: PlannerState) {
   sheet.getCell('G5').value = state.gradSem
   sheet.getCell('G6').value = state.advisor
 
-  for (const row of COURSE_ROWS) {
+  const courseRows = catalogToList(state.curriculum)
+    .map((c) => c.excelRow)
+    .filter((row): row is number => row != null)
+
+  for (const row of courseRows) {
     for (const col of COLS) {
       sheet.getCell(`${col}${row}`).value = null
     }
@@ -53,7 +58,7 @@ export async function exportProposalExcel(state: PlannerState) {
 
   const placements = getAllPlacements(state)
   for (const placement of placements) {
-    const row = resolveExcelRow(placement.course.id)
+    const row = resolveExcelRow(state, placement.course.id)
     if (!row || placement.semIndex < 0 || placement.semIndex >= COLS.length) {
       continue
     }
@@ -61,10 +66,7 @@ export async function exportProposalExcel(state: PlannerState) {
     sheet.getCell(`${col}${row}`).value = placement.course.credits
   }
 
-  // Row 48 (semester totals) and H50 (program total) contain shared formulas
-  // in the template — leave them so Excel recalculates from the course cells above.
-
   const safeName = state.name.trim().replace(/\s+/g, '_') || 'MEM_Proposal'
-  const buffer = await workbook.xlsx.writeBuffer()
-  downloadBuffer(buffer as ArrayBuffer, `${safeName}_Cornell_MEM_Proposal.xlsx`)
+  const outBuffer = await workbook.xlsx.writeBuffer()
+  downloadBuffer(outBuffer as ArrayBuffer, `${safeName}_Cornell_MEM_Proposal.xlsx`)
 }

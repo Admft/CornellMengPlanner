@@ -1,19 +1,28 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { CourseListItem, PlanCard } from './components/CourseItems'
+import { FeatureRequestModal } from './components/FeatureRequestModal'
 import {
-  ALL_COURSES,
-  EL,
-  OB,
-  PD1,
-  PD2,
-  REQ,
-  RES2,
+  DEFAULT_CURRICULUM,
+  catalogToList,
   seasonKey,
 } from './data/courses'
+import { LEGACY_COURSES } from './data/legacyCourses'
 import { relevantSemesters, semIdx } from './data/semesters'
+import { importCurriculumFromXlsx } from './lib/curriculumImport'
 import { exportProposalExcel } from './lib/excelExport'
-import { generatePlan, getCreditTotals } from './lib/planEngine'
-import { ADVISORS, DEFAULT_STATE, type PlannerState } from './types'
+import {
+  generatePlan,
+  getCreditTotals,
+  hasWorkshopsDone,
+} from './lib/planEngine'
+import {
+  ADVISORS,
+  DEFAULT_STATE,
+  type Course,
+  type CurriculumCatalog,
+  type CustomTakenCourse,
+  type PlannerState,
+} from './types'
 import './App.css'
 
 function toPlannerState(state: AppState): PlannerState {
@@ -21,7 +30,13 @@ function toPlannerState(state: AppState): PlannerState {
     ...state,
     taken: new Set(state.taken),
     elChoices: new Set(state.elChoices),
+    customTaken: state.customTaken,
+    curriculum: state.curriculum,
   }
+}
+
+function reqCourses(catalog: CurriculumCatalog) {
+  return catalog.req.filter((c) => c.cat !== 'cap')
 }
 
 interface AppState {
@@ -37,6 +52,9 @@ interface AppState {
   obChoice: string
   elChoices: string[]
   resChoice: 'session2' | 'workshops'
+  customTaken: CustomTakenCourse[]
+  curriculum: CurriculumCatalog
+  curriculumImported: boolean
 }
 
 const STEPS = ['Timeline', 'Courses Taken', 'Your Choices', 'Your Plan']
@@ -50,7 +68,7 @@ function CourseList({
   expanded,
   onExpand,
 }: {
-  courses: typeof ALL_COURSES
+  courses: Course[]
   inputType: 'checkbox' | 'radio'
   name: string
   selected: Set<string> | string
@@ -96,12 +114,30 @@ export default function App() {
     obChoice: DEFAULT_STATE.obChoice,
     elChoices: [],
     resChoice: DEFAULT_STATE.resChoice,
+    customTaken: [],
+    curriculum: DEFAULT_CURRICULUM,
+    curriculumImported: false,
   })
+  const proposalTemplateRef = useRef<ArrayBuffer | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [planExpanded, setPlanExpanded] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  const [importError, setImportError] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [showFeatureRequest, setShowFeatureRequest] = useState(false)
+  const [customDraft, setCustomDraft] = useState({ code: '', name: '', credits: '3' })
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { curriculum } = state
+  const REQ = reqCourses(curriculum)
+  const OB = curriculum.ob
+  const EL = curriculum.el
+  const RES2 = curriculum.res2
+  const PD1 = curriculum.pd1
+  const PD2 = curriculum.pd2
+  const ALL_COURSES = useMemo(() => catalogToList(curriculum), [curriculum])
 
   const planner = useMemo(() => toPlannerState(state), [state])
   const plan = useMemo(() => generatePlan(planner), [planner])
@@ -113,8 +149,8 @@ export default function App() {
 
   const takenOB = OB.filter((course) => takenSet.has(course.id))
   const takenElCount = EL.filter((course) => takenSet.has(course.id)).length
-  const hasRes2 = takenSet.has('EN6002')
-  const hasPDs = takenSet.has('EN6011') && takenSet.has('EN6012')
+  const hasRes2 = takenSet.has(RES2.id)
+  const hasPDs = hasWorkshopsDone(takenSet)
 
   const filteredElectives = EL.filter((course) => {
     if (takenSet.has(course.id)) return false
@@ -123,8 +159,57 @@ export default function App() {
     return true
   })
 
-  const takenCourses = ALL_COURSES.filter((course) => takenSet.has(course.id))
+  const takenCourses = [
+    ...ALL_COURSES.filter((course) => takenSet.has(course.id)),
+    ...LEGACY_COURSES.filter((course) => takenSet.has(course.id)),
+  ]
   const pct = Math.min(100, Math.round((credits.total / 30) * 100))
+
+  async function handleCurriculumImport(file: File) {
+    setImportError('')
+    setImporting(true)
+    try {
+      const buffer = await file.arrayBuffer()
+      const { catalog } = await importCurriculumFromXlsx(buffer)
+      proposalTemplateRef.current = buffer
+      setState((prev) => ({
+        ...prev,
+        curriculum: catalog,
+        curriculumImported: true,
+        obChoice: catalog.ob.some((c) => c.id === prev.obChoice) ? prev.obChoice : '',
+        elChoices: prev.elChoices.filter((id) => catalog.el.some((c) => c.id === id)),
+      }))
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : 'Could not read that spreadsheet.',
+      )
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function addCustomTaken() {
+    const credits = Number(customDraft.credits)
+    if (!customDraft.name.trim() || Number.isNaN(credits) || credits <= 0) return
+    const entry: CustomTakenCourse = {
+      id: `custom-${Date.now()}`,
+      code: customDraft.code.trim() || 'Custom',
+      name: customDraft.name.trim(),
+      credits,
+    }
+    setState((prev) => ({
+      ...prev,
+      customTaken: [...prev.customTaken, entry],
+    }))
+    setCustomDraft({ code: '', name: '', credits: '3' })
+  }
+
+  function removeCustomTaken(id: string) {
+    setState((prev) => ({
+      ...prev,
+      customTaken: prev.customTaken.filter((c) => c.id !== id),
+    }))
+  }
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
@@ -178,7 +263,7 @@ export default function App() {
     setExportError('')
     setExporting(true)
     try {
-      await exportProposalExcel(planner)
+      await exportProposalExcel(planner, proposalTemplateRef.current)
     } catch (error) {
       setExportError(
         error instanceof Error ? error.message : 'Export failed. Please try again.',
@@ -191,10 +276,24 @@ export default function App() {
   return (
     <>
       <header className="hdr">
-        <span className="hdr-word">Cornell Engineering</span>
-        <span className="hdr-sep">|</span>
-        <span className="hdr-app">M.Eng. Management · Course Planner</span>
+        <div className="hdr-brand">
+          <span className="hdr-word">Cornell Engineering</span>
+          <span className="hdr-sep">|</span>
+          <span className="hdr-app">M.Eng. Management · Course Planner</span>
+        </div>
+        <button
+          type="button"
+          className="hdr-request"
+          onClick={() => setShowFeatureRequest(true)}
+        >
+          Request a change
+        </button>
       </header>
+
+      <FeatureRequestModal
+        open={showFeatureRequest}
+        onClose={() => setShowFeatureRequest(false)}
+      />
 
       <nav className="pnav">
         {STEPS.map((label, index) => {
@@ -329,6 +428,49 @@ export default function App() {
                 The MEM program requires a minimum of <strong>30 credits</strong>.
                 Most students complete it in 4–6 semesters (about 2 years).
               </span>
+            </div>
+
+            <div className="card">
+              <div className="sec-label">Curriculum version</div>
+              <div className="info-row" style={{ marginBottom: 14 }}>
+                <span className="info-icon">📄</span>
+                <span>
+                  Cornell updates the course list most semesters. If you received a
+                  newer proposal spreadsheet, import it here to load the latest
+                  classes. Otherwise the current curriculum is already loaded.
+                </span>
+              </div>
+              <div className="import-row">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="file-input-hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void handleCurriculumImport(file)
+                    e.target.value = ''
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={importing}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {importing ? 'Importing…' : 'Import proposal .xlsx'}
+                </button>
+                <span className="import-status">
+                  {state.curriculumImported
+                    ? '✓ Custom curriculum loaded from your file'
+                    : 'Using latest curriculum (updated proposal)'}
+                </span>
+              </div>
+              {importError && (
+                <div className="val-msg show" style={{ marginTop: 12 }}>
+                  ⚠ {importError}
+                </div>
+              )}
             </div>
 
             <div className="card">
@@ -467,6 +609,110 @@ export default function App() {
                 }
               />
             </div>
+
+            <div className="card legacy-card">
+              <div className="sec-label">
+                Previous curriculum courses{' '}
+                <span className="sec-note">(old &amp; new versions — check if already done)</span>
+              </div>
+              <div className="info-row" style={{ marginBottom: 12 }}>
+                <span className="info-icon">🕐</span>
+                <span>
+                  If you started under an older proposal, mark courses here.
+                  Includes removed classes (e.g. ENMGT 5940) and previous credit
+                  amounts (e.g. Data Analytics was 4 cr).
+                </span>
+              </div>
+              <CourseList
+                courses={LEGACY_COURSES}
+                inputType="checkbox"
+                name="taken-legacy"
+                selected={takenSet}
+                expanded={expanded}
+                onExpand={toggleExpanded}
+                onToggle={(id, checked) =>
+                  setState((prev) => ({
+                    ...prev,
+                    taken: checked
+                      ? [...prev.taken, id]
+                      : prev.taken.filter((item) => item !== id),
+                  }))
+                }
+              />
+            </div>
+
+            <div className="card">
+              <div className="sec-label">Custom completed courses</div>
+              <div className="info-row" style={{ marginBottom: 14 }}>
+                <span className="info-icon">✏️</span>
+                <span>
+                  If you took a course that was removed from the curriculum and
+                  isn&apos;t listed above, add it here with the credit amount from
+                  your transcript.
+                </span>
+              </div>
+              {state.customTaken.length > 0 && (
+                <div className="custom-taken-list">
+                  {state.customTaken.map((course) => (
+                    <div key={course.id} className="custom-taken-item">
+                      <span className="ci-code">{course.code}</span>
+                      <span className="ci-name">{course.name}</span>
+                      <span className="ci-cr">{course.credits} cr</span>
+                      <button
+                        type="button"
+                        className="custom-remove"
+                        onClick={() => removeCustomTaken(course.id)}
+                        aria-label="Remove"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="custom-add-row">
+                <div className="fg">
+                  <label htmlFor="customCode">Course code</label>
+                  <input
+                    id="customCode"
+                    type="text"
+                    value={customDraft.code}
+                    onChange={(e) =>
+                      setCustomDraft((prev) => ({ ...prev, code: e.target.value }))
+                    }
+                    placeholder="ENMGT 5940"
+                  />
+                </div>
+                <div className="fg">
+                  <label htmlFor="customName">Course name</label>
+                  <input
+                    id="customName"
+                    type="text"
+                    value={customDraft.name}
+                    onChange={(e) =>
+                      setCustomDraft((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    placeholder="Economics and Finance…"
+                  />
+                </div>
+                <div className="fg fg-narrow">
+                  <label htmlFor="customCredits">Credits</label>
+                  <input
+                    id="customCredits"
+                    type="number"
+                    min={0.5}
+                    step={0.5}
+                    value={customDraft.credits}
+                    onChange={(e) =>
+                      setCustomDraft((prev) => ({ ...prev, credits: e.target.value }))
+                    }
+                  />
+                </div>
+                <button type="button" className="btn btn-secondary" onClick={addCustomTaken}>
+                  + Add
+                </button>
+              </div>
+            </div>
           </section>
         )}
 
@@ -583,10 +829,10 @@ export default function App() {
                   >
                     <div className="res-opt-title">Two PD Workshops</div>
                     <div className="res-opt-desc">
-                      Take ENMGT 6011 + ENMGT 6012 instead of the residential
+                      Take {PD1.code} + {PD2.code} instead of the residential
                       session.
                     </div>
-                    <div className="res-opt-cr">0.5 + 0.5 credits · Fall or Spring</div>
+                    <div className="res-opt-cr">{PD1.credits} + {PD2.credits} credits · Fall or Spring</div>
                   </div>
                 </div>
               )}
@@ -731,7 +977,7 @@ export default function App() {
               </div>
             </div>
 
-            {takenCourses.length > 0 && (
+            {(takenCourses.length > 0 || state.customTaken.length > 0) && (
               <div className="sem-block">
                 <div className="sem-hdr">
                   <span className="sem-pill completed-pill">✓ Completed</span>
@@ -746,6 +992,28 @@ export default function App() {
                       onToggle={() => togglePlanExpanded(course.id)}
                     />
                   ))}
+                  {state.customTaken.map((course) => {
+                    const asCourse: Course = {
+                      id: course.id,
+                      code: course.code,
+                      name: course.name,
+                      credits: course.credits,
+                      seasons: [],
+                      prereqs: [],
+                      cat: 'el',
+                      pri: 4,
+                      desc: 'Custom completed course (removed from current curriculum).',
+                      notes: 'Added manually from your transcript.',
+                    }
+                    return (
+                      <PlanCard
+                        key={course.id}
+                        course={asCourse}
+                        expanded={planExpanded.has(course.id)}
+                        onToggle={() => togglePlanExpanded(course.id)}
+                      />
+                    )
+                  })}
                 </div>
                 {plan.sems.length > 0 && <div className="divider" />}
               </div>
@@ -779,6 +1047,7 @@ export default function App() {
             })}
 
             {takenCourses.length === 0 &&
+              state.customTaken.length === 0 &&
               plan.sems.every((sem) => !plan.plan[sem.code]?.courses.length) && (
                 <div className="empty">
                   No courses to display. Complete the previous steps to build your

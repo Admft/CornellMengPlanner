@@ -13,6 +13,23 @@ export interface Course {
   desc: string
   notes: string
   excelRow?: number
+  legacy?: boolean
+}
+
+export interface CustomTakenCourse {
+  id: string
+  code: string
+  name: string
+  credits: number
+}
+
+export interface CurriculumCatalog {
+  req: Course[]
+  ob: Course[]
+  el: Course[]
+  res2: Course
+  pd1: Course
+  pd2: Course
 }
 
 export interface Semester {
@@ -35,6 +52,8 @@ export interface PlannerState {
   obChoice: string
   elChoices: Set<string>
   resChoice: 'session2' | 'workshops'
+  customTaken: CustomTakenCourse[]
+  curriculum: CurriculumCatalog
 }
 
 export interface SemesterPlan {
@@ -70,7 +89,7 @@ export const SEM_COLS = [
   'P',
 ] as const
 
-export const DEFAULT_STATE: PlannerState = {
+export const DEFAULT_STATE: Omit<PlannerState, 'curriculum'> = {
   step: 1,
   name: '',
   studentId: '',
@@ -83,4 +102,5 @@ export const DEFAULT_STATE: PlannerState = {
   obChoice: '',
   elChoices: new Set(),
   resChoice: 'session2',
+  customTaken: [],
 }

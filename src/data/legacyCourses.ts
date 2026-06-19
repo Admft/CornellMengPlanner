@@ -1,0 +1,47 @@
+import type { Course } from '../types'
+
+/** Courses from the previous curriculum — removed, replaced, or changed credit amounts. */
+export const LEGACY_COURSES: Course[] = [
+  {
+    id: 'EN5930_legacy',
+    code: 'ENMGT 5930',
+    name: 'Data Analytics',
+    credits: 4,
+    seasons: ['Fall'],
+    prereqs: [],
+    cat: 'req',
+    pri: 1,
+    desc: 'Statistical modeling, machine learning, and data visualization techniques applied to engineering and business decision-making.',
+    notes: 'Previous curriculum (4 credits). Current curriculum is 3 credits.',
+    legacy: true,
+    excelRow: 16,
+  },
+  {
+    id: 'EN5940',
+    code: 'ENMGT 5940',
+    name: 'Economics and Finance for Engineering Management',
+    credits: 4,
+    seasons: ['Spring'],
+    prereqs: [],
+    cat: 'req',
+    pri: 1,
+    desc: 'Microeconomic principles, financial analysis, capital budgeting, valuation methods, and investment decision-making for engineering leaders.',
+    notes: 'Previous curriculum (Spring only). Replaced by ENMGT 5941 + ENMGT 5942.',
+    legacy: true,
+    excelRow: 17,
+  },
+  {
+    id: 'EN6012',
+    code: 'ENMGT 6012',
+    name: 'Professional Development Workshop II',
+    credits: 0.5,
+    seasons: ['Fall', 'Spring'],
+    prereqs: [],
+    cat: 'res',
+    pri: 1,
+    desc: 'Advanced professional development: negotiation, networking, and leadership brand for engineering managers.',
+    notes: 'Previous curriculum. Replaced by ENMGT 6010 + ENMGT 6011 pair.',
+    legacy: true,
+    excelRow: 21,
+  },
+]
