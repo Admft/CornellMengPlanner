@@ -45,7 +45,8 @@ export interface PlannerState {
   studentId: string
   netId: string
   advisor: string
-  startSem: string
+  planFromSem: string
+  programStartSem: string
   gradSem: string
   crLimit: number
   taken: Set<string>
@@ -89,13 +90,16 @@ export const SEM_COLS = [
   'P',
 ] as const
 
-export const DEFAULT_STATE: Omit<PlannerState, 'curriculum'> = {
+export const DEFAULT_STATE: Omit<PlannerState, 'curriculum' | 'planFromSem'> & {
+  planFromSem: string
+} = {
   step: 1,
   name: '',
   studentId: '',
   netId: '',
   advisor: 'Robert Newman',
-  startSem: 'SP26',
+  planFromSem: 'SU26',
+  programStartSem: '',
   gradSem: 'SP28',
   crLimit: 8,
   taken: new Set(),

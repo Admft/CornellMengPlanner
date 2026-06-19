@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs'
 import { catalogToList } from '../data/courses'
 import { getAllPlacements } from './planEngine'
-import type { PlannerState } from '../types'
+import type { GeneratedPlan, PlannerState } from '../types'
 import { SEM_COLS as COLS } from '../types'
 
 function resolveExcelRow(state: PlannerState, courseId: string): number | undefined {
@@ -24,6 +24,7 @@ function downloadBuffer(buffer: ArrayBuffer, filename: string) {
 export async function exportProposalExcel(
   state: PlannerState,
   templateBuffer?: ArrayBuffer | null,
+  displayPlan?: GeneratedPlan,
 ) {
   let buffer = templateBuffer
   if (!buffer) {
@@ -42,7 +43,7 @@ export async function exportProposalExcel(
   sheet.getCell('C4').value = state.name
   sheet.getCell('C5').value = state.studentId
   sheet.getCell('C6').value = state.netId
-  sheet.getCell('G4').value = state.startSem
+  sheet.getCell('G4').value = state.programStartSem.trim() || state.planFromSem
   sheet.getCell('G5').value = state.gradSem
   sheet.getCell('G6').value = state.advisor
 
@@ -56,7 +57,7 @@ export async function exportProposalExcel(
     }
   }
 
-  const placements = getAllPlacements(state)
+  const placements = getAllPlacements(state, displayPlan)
   for (const placement of placements) {
     const row = resolveExcelRow(state, placement.course.id)
     if (!row || placement.semIndex < 0 || placement.semIndex >= COLS.length) {

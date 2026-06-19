@@ -61,9 +61,21 @@ interface PlanCardProps {
   course: Course
   expanded: boolean
   onToggle: () => void
+  draggable?: boolean
+  onDragStart?: () => void
+  onDragEnd?: () => void
+  isDragging?: boolean
 }
 
-export function PlanCard({ course, expanded, onToggle }: PlanCardProps) {
+export function PlanCard({
+  course,
+  expanded,
+  onToggle,
+  draggable = false,
+  onDragStart,
+  onDragEnd,
+  isDragging = false,
+}: PlanCardProps) {
   const catClass =
     course.cat === 'req' || course.cat === 'cap'
       ? 'cat-req'
@@ -94,8 +106,22 @@ export function PlanCard({ course, expanded, onToggle }: PlanCardProps) {
             : 'Elective'
 
   return (
-    <div className={`pc ${catClass} ${expanded ? 'xpd' : ''}`}>
-      <div className="pc-hdr" onClick={onToggle}>
+    <div
+      className={`pc ${catClass} ${expanded ? 'xpd' : ''} ${isDragging ? 'pc-dragging' : ''} ${draggable ? 'pc-draggable' : ''}`}
+      draggable={draggable}
+      onDragStart={(e) => {
+        if (!draggable) return
+        e.dataTransfer.setData('text/plain', course.id)
+        e.dataTransfer.effectAllowed = 'move'
+        onDragStart?.()
+      }}
+      onDragEnd={() => onDragEnd?.()}
+    >
+      <div
+        className="pc-hdr"
+        onClick={onToggle}
+      >
+        {draggable && <span className="pc-drag" title="Drag to move">⠿</span>}
         <span className="pc-code">{course.code}</span>
         <span className="pc-name">{course.name}</span>
         <span className={`pc-tag ${tagClass}`}>{tagLabel}</span>

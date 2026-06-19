@@ -1071,6 +1071,36 @@ select:focus {
   display: block;
 }
 
+.pc-draggable .pc-hdr {
+  cursor: grab;
+}
+
+.pc-draggable:active .pc-hdr {
+  cursor: grabbing;
+}
+
+.pc-dragging {
+  opacity: 0.45;
+}
+
+.pc-drag {
+  color: var(--text3);
+  font-size: 14px;
+  margin-right: 4px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.sem-body.sem-drop-valid {
+  outline: 2px dashed var(--red);
+  outline-offset: 2px;
+  background: var(--red-tint);
+}
+
+.sem-body.sem-drop-invalid {
+  opacity: 0.55;
+}
+
 .alert {
   display: flex;
   gap: 10px;

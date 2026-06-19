@@ -8,6 +8,7 @@ import {
 import { LEGACY_COURSES } from '../data/legacyCourses'
 import { semRange } from '../data/semesters'
 import type { Course, CurriculumCatalog, GeneratedPlan, PlannerState, SemesterPlan } from '../types'
+import { MIN_DEGREE_CREDITS } from './planLayout'
 
 export interface CoursePlacement {
   course: Course
@@ -15,15 +16,30 @@ export interface CoursePlacement {
   semIndex: number
 }
 
+const MIN_ELECTIVES = 2
+
 function allKnownCourses(catalog: CurriculumCatalog): Course[] {
   return [...catalogToList(catalog), ...LEGACY_COURSES]
 }
 
-function resolveCourse(id: string, catalog: CurriculumCatalog): Course | undefined {
+export function resolveCourse(id: string, catalog: CurriculumCatalog): Course | undefined {
   return getCourseById(id, catalog) ?? LEGACY_COURSES.find((c) => c.id === id)
 }
 
-function buildQueue(state: PlannerState): Course[] {
+function takenCredits(state: PlannerState): number {
+  const fromTaken = [...state.taken].reduce((sum, id) => {
+    const course = resolveCourse(id, state.curriculum)
+    return sum + (course?.credits ?? 0)
+  }, 0)
+  const custom = state.customTaken.reduce((sum, c) => sum + c.credits, 0)
+  return fromTaken + custom
+}
+
+function takenElectiveCount(state: PlannerState): number {
+  return state.curriculum.el.filter((c) => state.taken.has(c.id)).length
+}
+
+function nonElectiveQueue(state: PlannerState): Course[] {
   const { curriculum } = state
   const done = new Set(state.taken)
   const queue: Course[] = []
@@ -44,18 +60,84 @@ function buildQueue(state: PlannerState): Course[] {
     if (ob) queue.push({ ...ob })
   }
 
+  return queue.sort((a, b) => a.pri - b.pri)
+}
+
+/** Pick fewest elective credits that still meets the 2-course rule and lands near 30 total. */
+function optimizeElectives(state: PlannerState, candidates: Course[]): Course[] {
+  const minCount = Math.max(0, MIN_ELECTIVES - takenElectiveCount(state))
+  if (candidates.length === 0) return []
+  if (candidates.length <= minCount) return candidates
+
+  const fixed = nonElectiveQueue(state)
+  const fixedCredits = fixed.reduce((sum, c) => sum + c.credits, 0)
+  const already = takenCredits(state)
+  const n = candidates.length
+
+  let best: Course[] | null = null
+  let bestTotal = Infinity
+
+  for (let mask = 0; mask < 1 << n; mask++) {
+    const subset: Course[] = []
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) subset.push(candidates[i])
+    }
+    if (subset.length < minCount) continue
+
+    const total =
+      already + fixedCredits + subset.reduce((sum, course) => sum + course.credits, 0)
+    if (total < MIN_DEGREE_CREDITS) continue
+
+    if (
+      total < bestTotal ||
+      (total === bestTotal && subset.length < (best?.length ?? Infinity))
+    ) {
+      bestTotal = total
+      best = subset
+    }
+  }
+
+  if (best) return best
+
+  // Can't reach 30 — use minimum count, prefer lower-credit electives
+  const sorted = [...candidates].sort((a, b) => a.credits - b.credits || a.pri - b.pri)
+  return sorted.slice(0, minCount)
+}
+
+function buildQueue(state: PlannerState): Course[] {
+  const done = new Set(state.taken)
+  const queue = nonElectiveQueue(state)
+
+  const electiveCandidates: Course[] = []
   state.elChoices.forEach((courseId) => {
     if (!isCourseCompleted(courseId, done)) {
-      const elective = curriculum.el.find((course) => course.id === courseId)
-      if (elective) queue.push({ ...elective })
+      const elective = state.curriculum.el.find((course) => course.id === courseId)
+      if (elective) electiveCandidates.push({ ...elective })
     }
   })
+
+  const optimized = optimizeElectives(state, electiveCandidates)
+  queue.push(...optimized)
 
   return queue.sort((a, b) => a.pri - b.pri)
 }
 
+export function getSkippedElectives(state: PlannerState): Course[] {
+  const done = new Set(state.taken)
+  const chosen: Course[] = []
+  state.elChoices.forEach((courseId) => {
+    if (!isCourseCompleted(courseId, done)) {
+      const elective = state.curriculum.el.find((course) => course.id === courseId)
+      if (elective) chosen.push(elective)
+    }
+  })
+  const optimized = optimizeElectives(state, chosen)
+  const optimizedIds = new Set(optimized.map((c) => c.id))
+  return chosen.filter((c) => !optimizedIds.has(c.id))
+}
+
 export function generatePlan(state: PlannerState): GeneratedPlan {
-  const sems = semRange(state.startSem, state.gradSem)
+  const sems = semRange(state.planFromSem, state.gradSem)
   const done = new Set(state.taken)
   let queue = buildQueue(state)
 
@@ -97,8 +179,11 @@ export function generatePlan(state: PlannerState): GeneratedPlan {
   return { plan, unscheduled: queue, sems }
 }
 
-export function getAllPlacements(state: PlannerState): CoursePlacement[] {
-  const { plan, sems } = generatePlan(state)
+export function getAllPlacements(
+  state: PlannerState,
+  displayPlan?: GeneratedPlan,
+): CoursePlacement[] {
+  const { plan, sems } = displayPlan ?? generatePlan(state)
   const placements: CoursePlacement[] = []
   const done = new Set<string>()
   const semLoads = new Map<string, number>()
@@ -147,26 +232,23 @@ export function getAllPlacements(state: PlannerState): CoursePlacement[] {
   return placements
 }
 
-export function getCreditTotals(state: PlannerState) {
-  const { plan, unscheduled } = generatePlan(state)
-  const takenCredits = [...state.taken].reduce((sum, id) => {
-    const course = resolveCourse(id, state.curriculum)
-    return sum + (course?.credits ?? 0)
-  }, 0)
+export function getCreditTotals(state: PlannerState, displayPlan?: GeneratedPlan) {
+  const plan = displayPlan ?? generatePlan(state)
+  const { unscheduled } = plan
+  const takenCr = takenCredits(state)
 
-  const customCredits = state.customTaken.reduce((sum, c) => sum + c.credits, 0)
-
-  const plannedCredits = Object.values(plan).reduce(
+  const plannedCredits = Object.values(plan.plan).reduce(
     (sum, semester) => sum + semester.cr,
     0,
   )
 
   return {
-    takenCredits: takenCredits + customCredits,
+    takenCredits: takenCr,
     plannedCredits,
-    total: takenCredits + customCredits + plannedCredits,
+    total: takenCr + plannedCredits,
     unscheduled,
   }
 }
 
-export { hasWorkshopsDone, allKnownCourses, resolveCourse }
+export { hasWorkshopsDone, allKnownCourses }
+export { MIN_DEGREE_CREDITS } from './planLayout'

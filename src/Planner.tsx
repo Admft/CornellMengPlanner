@@ -8,14 +8,23 @@ import {
   seasonKey,
 } from './data/courses'
 import { LEGACY_COURSES } from './data/legacyCourses'
-import { relevantSemesters, semIdx } from './data/semesters'
+import { graduationSemesters, defaultNextSemesterCode, planningSemesters, semIdx } from './data/semesters'
 import { importCurriculumFromXlsx } from './lib/curriculumImport'
 import { exportProposalExcel } from './lib/excelExport'
 import {
   generatePlan,
   getCreditTotals,
+  getSkippedElectives,
   hasWorkshopsDone,
+  resolveCourse,
 } from './lib/planEngine'
+import {
+  canPlaceCourse,
+  layoutToPlan,
+  moveCourseInLayout,
+  planToLayout,
+  validDropSemesters,
+} from './lib/planLayout'
 import {
   ADVISORS,
   DEFAULT_STATE,
@@ -47,7 +56,8 @@ interface AppState {
   studentId: string
   netId: string
   advisor: string
-  startSem: string
+  planFromSem: string
+  programStartSem: string
   gradSem: string
   crLimit: number
   taken: string[]
@@ -57,6 +67,7 @@ interface AppState {
   customTaken: CustomTakenCourse[]
   curriculum: CurriculumCatalog
   curriculumImported: boolean
+  planLayout: Record<string, string[]> | null
 }
 
 const STEPS = ['Timeline', 'Courses Taken', 'Your Choices', 'Your Plan']
@@ -110,7 +121,8 @@ export default function Planner() {
     studentId: DEFAULT_STATE.studentId,
     netId: DEFAULT_STATE.netId,
     advisor: DEFAULT_STATE.advisor,
-    startSem: DEFAULT_STATE.startSem,
+    planFromSem: defaultNextSemesterCode(),
+    programStartSem: DEFAULT_STATE.programStartSem,
     gradSem: DEFAULT_STATE.gradSem,
     crLimit: DEFAULT_STATE.crLimit,
     taken: [],
@@ -120,10 +132,13 @@ export default function Planner() {
     customTaken: [],
     curriculum: DEFAULT_CURRICULUM,
     curriculumImported: false,
+    planLayout: null,
   })
   const proposalTemplateRef = useRef<ArrayBuffer | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [planExpanded, setPlanExpanded] = useState<Set<string>>(new Set())
+  const [drag, setDrag] = useState<{ courseId: string; fromSem: string } | null>(null)
+  const [dropHint, setDropHint] = useState('')
   const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -147,9 +162,18 @@ export default function Planner() {
   }, [])
 
   const planner = useMemo(() => toPlannerState(state), [state])
-  const plan = useMemo(() => generatePlan(planner), [planner])
-  const credits = useMemo(() => getCreditTotals(planner), [planner])
-  const semesterOptions = relevantSemesters()
+  const basePlan = useMemo(() => generatePlan(planner), [planner])
+  const skippedElectives = useMemo(() => getSkippedElectives(planner), [planner])
+  const plan = useMemo(() => {
+    if (!state.planLayout) return basePlan
+    return layoutToPlan(state.planLayout, basePlan.sems, state.curriculum)
+  }, [basePlan, state.planLayout, state.curriculum])
+  const credits = useMemo(() => getCreditTotals(planner, plan), [planner, plan])
+  const planSemesterOptions = useMemo(() => planningSemesters(), [])
+  const gradSemesterOptions = useMemo(
+    () => graduationSemesters(state.planFromSem),
+    [state.planFromSem],
+  )
 
   const takenSet = useMemo(() => new Set(state.taken), [state.taken])
   const elSet = useMemo(() => new Set(state.elChoices), [state.elChoices])
@@ -176,6 +200,14 @@ export default function Planner() {
     ...LEGACY_COURSES.filter((course) => takenSet.has(course.id)),
   ]
   const pct = Math.min(100, Math.round((credits.total / 30) * 100))
+  const creditOvershoot = credits.total - 30
+
+  const validDropSems = useMemo(() => {
+    if (!drag) return new Set<string>()
+    const course = resolveCourse(drag.courseId, state.curriculum)
+    if (!course) return new Set<string>()
+    return validDropSemesters(course, drag.fromSem, plan.sems, plan, planner)
+  }, [drag, plan, planner, state.curriculum])
 
   async function handleCurriculumImport(file: File) {
     setImportError('')
@@ -223,6 +255,39 @@ export default function Planner() {
     }))
   }
 
+  function recalculatePlan() {
+    setState((prev) => ({ ...prev, planLayout: null }))
+    setDrag(null)
+    setDropHint('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handlePlanDrop(targetSemCode: string) {
+    if (!drag) return
+    const course = resolveCourse(drag.courseId, state.curriculum)
+    if (!course) return
+
+    const layout = state.planLayout ?? planToLayout(basePlan)
+    const targetSem = plan.sems.find((s) => s.code === targetSemCode)
+    if (!targetSem) return
+
+    const check = canPlaceCourse(course, targetSem, plan.sems, plan.plan, planner, {
+      excludeCourseId: course.id,
+      fromSemCode: drag.fromSem,
+    })
+    if (!check.ok) {
+      setDropHint(check.reason)
+      return
+    }
+
+    setState((prev) => ({
+      ...prev,
+      planLayout: moveCourseInLayout(layout, drag.courseId, drag.fromSem, targetSemCode),
+    }))
+    setDrag(null)
+    setDropHint('')
+  }
+
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
       const next = new Set(prev)
@@ -243,7 +308,7 @@ export default function Planner() {
 
   function validate(step: number) {
     if (step === 1) {
-      const ok = semIdx(state.gradSem) > semIdx(state.startSem) + 1
+      const ok = semIdx(state.gradSem) >= semIdx(state.planFromSem)
       setErrors((prev) => ({ ...prev, timeline: !ok }))
       return ok
     }
@@ -259,7 +324,11 @@ export default function Planner() {
   function goNext() {
     if (!validate(state.step)) return
     if (state.step < 4) {
-      setState((prev) => ({ ...prev, step: prev.step + 1 }))
+      setState((prev) => ({
+        ...prev,
+        step: prev.step + 1,
+        planLayout: prev.step === 3 ? null : prev.planLayout,
+      }))
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
@@ -275,7 +344,7 @@ export default function Planner() {
     setExportError('')
     setExporting(true)
     try {
-      await exportProposalExcel(planner, proposalTemplateRef.current)
+      await exportProposalExcel(planner, proposalTemplateRef.current, plan)
       void recordExcelExport()
     } catch (error) {
       setExportError(
@@ -333,10 +402,12 @@ export default function Planner() {
       <main className="main">
         {state.step === 1 && (
           <section className="step active">
-            <h1 className="step-title">Set your program timeline</h1>
+            <h1 className="step-title">Set your planning timeline</h1>
             <p className="step-sub">
-              Enter your student information and choose when you started (or will
-              start) the MEM program and when you want to graduate.
+              Enter your student information, pick the <strong>next semester</strong> you
+              want to plan for, and when you want to graduate. Already partway through
+              the program? Mark completed courses in Step 2 — you don&apos;t need your
+              original start date here.
             </p>
 
             <div className="card">
@@ -401,21 +472,33 @@ export default function Planner() {
             <div className="card">
               <div className="form-row">
                 <div className="fg">
-                  <label htmlFor="startSem">Program start semester</label>
+                  <label htmlFor="planFromSem">Next semester</label>
                   <select
-                    id="startSem"
-                    value={state.startSem}
-                    onChange={(e) =>
-                      setState((prev) => ({ ...prev, startSem: e.target.value }))
-                    }
+                    id="planFromSem"
+                    value={state.planFromSem}
+                    onChange={(e) => {
+                      const planFromSem = e.target.value
+                      setState((prev) => {
+                        const gradOk =
+                          semIdx(prev.gradSem) >= semIdx(planFromSem)
+                        return {
+                          ...prev,
+                          planFromSem,
+                          gradSem: gradOk ? prev.gradSem : planFromSem,
+                        }
+                      })
+                    }}
                   >
-                    {semesterOptions.map((sem) => (
+                    {planSemesterOptions.map((sem) => (
                       <option key={sem.code} value={sem.code}>
                         {sem.label}
                       </option>
                     ))}
                   </select>
-                  <span className="hint">First semester in the MEM program.</span>
+                  <span className="hint">
+                    First semester to include in your plan — usually the one
+                    you&apos;re heading into next.
+                  </span>
                 </div>
                 <div className="fg">
                   <label htmlFor="gradSem">Target graduation semester</label>
@@ -426,17 +509,43 @@ export default function Planner() {
                       setState((prev) => ({ ...prev, gradSem: e.target.value }))
                     }
                   >
-                    {semesterOptions.map((sem) => (
+                    {gradSemesterOptions.map((sem) => (
                       <option key={sem.code} value={sem.code}>
                         {sem.label}
                       </option>
                     ))}
                   </select>
-                  <span className="hint">Semester you want to complete the degree.</span>
+                  <span className="hint">Last semester you want on your degree plan.</span>
+                </div>
+              </div>
+              <div className="form-row" style={{ marginTop: 16 }}>
+                <div className="fg">
+                  <label htmlFor="programStartSem">
+                    Program start semester{' '}
+                    <span className="sec-note">(optional — for Excel export)</span>
+                  </label>
+                  <select
+                    id="programStartSem"
+                    value={state.programStartSem}
+                    onChange={(e) =>
+                      setState((prev) => ({ ...prev, programStartSem: e.target.value }))
+                    }
+                  >
+                    <option value="">Same as next semester</option>
+                    {planSemesterOptions.map((sem) => (
+                      <option key={sem.code} value={sem.code}>
+                        {sem.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="hint">
+                    Only for the official proposal form&apos;s &quot;Starting&quot; field.
+                    Leave blank if you&apos;re just planning ahead.
+                  </span>
                 </div>
               </div>
               <div className={`val-msg ${errors.timeline ? 'show' : ''}`}>
-                ⚠ Graduation must be at least 2 semesters after your start.
+                ⚠ Graduation must be the same semester or later than your next semester.
               </div>
             </div>
 
@@ -963,10 +1072,29 @@ export default function Planner() {
               </div>
             </div>
             <p className="step-sub">
-              Courses are scheduled semester-by-semester based on availability,
-              prerequisites, and your graduation target. Export downloads the
-              official Cornell proposal form with your plan filled in.
+              Courses are scheduled by semester. <strong>Drag courses</strong> between
+              semesters to adjust — only valid slots highlight (season, prerequisites,
+              credit caps). Export downloads the official Cornell proposal form.
             </p>
+
+            {skippedElectives.length > 0 && (
+              <div className="alert alert-ok">
+                <span className="alert-icon">✓</span>
+                <div>
+                  <strong>Optimized toward 30 credits.</strong> Left out{' '}
+                  {skippedElectives.map((c) => c.code).join(', ')} — you had more
+                  electives selected than needed. Add them back in Step 3 if you want
+                  them anyway.
+                </div>
+              </div>
+            )}
+
+            {dropHint && (
+              <div className="alert alert-warn">
+                <span className="alert-icon">⚠</span>
+                <div>{dropHint}</div>
+              </div>
+            )}
 
             {exportError && (
               <div className="alert alert-err">
@@ -1004,22 +1132,44 @@ export default function Planner() {
               </div>
             )}
 
+            {credits.total > 30 && creditOvershoot > 0 && (
+              <div className="alert alert-warn">
+                <span className="alert-icon">💰</span>
+                <div>
+                  Your plan is <strong>{credits.total} credits</strong> —{' '}
+                  <strong>{creditOvershoot} above</strong> the 30-credit minimum. Some
+                  requirements can&apos;t go lower than this; deselect extra electives in
+                  Step 3 or drag courses to spread the load.
+                </div>
+              </div>
+            )}
+
+            {credits.total >= 30 && credits.total <= 31 && plan.unscheduled.length === 0 && (
+              <div className="alert alert-ok">
+                <span className="alert-icon">✓</span>
+                <div>
+                  Your plan totals <strong>{credits.total} credits</strong> — right at
+                  the 30-credit target.
+                </div>
+              </div>
+            )}
+
+            {credits.total >= 30 && credits.total > 31 && plan.unscheduled.length === 0 && skippedElectives.length === 0 && (
+              <div className="alert alert-ok">
+                <span className="alert-icon">✓</span>
+                <div>
+                  Your plan meets the 30-credit requirement with{' '}
+                  <strong>{credits.total} credits</strong> across your program.
+                </div>
+              </div>
+            )}
+
             {credits.total < 30 && (
               <div className="alert alert-warn">
                 <span className="alert-icon">📊</span>
                 <div>
                   Your current plan totals <strong>{credits.total} credits</strong>{' '}
                   — you need at least 30. Consider adding more electives in Step 3.
-                </div>
-              </div>
-            )}
-
-            {credits.total >= 30 && plan.unscheduled.length === 0 && (
-              <div className="alert alert-ok">
-                <span className="alert-icon">✓</span>
-                <div>
-                  Your plan meets the 30-credit requirement with{' '}
-                  <strong>{credits.total} credits</strong> across your program.
                 </div>
               </div>
             )}
@@ -1050,6 +1200,7 @@ export default function Planner() {
                       setState((prev) => ({
                         ...prev,
                         crLimit: Math.max(4, prev.crLimit - 1),
+                        planLayout: null,
                       }))
                     }
                   >
@@ -1063,6 +1214,7 @@ export default function Planner() {
                       setState((prev) => ({
                         ...prev,
                         crLimit: Math.min(12, prev.crLimit + 1),
+                        planLayout: null,
                       }))
                     }
                   >
@@ -1141,6 +1293,8 @@ export default function Planner() {
               if (!semPlan || semPlan.courses.length === 0) return null
               const borderClass = `${seasonKey(sem.season)}-border`
               const pillClass = seasonKey(sem.season)
+              const isValidDrop = drag && validDropSems.has(sem.code)
+              const isInvalidDrop = drag && !validDropSems.has(sem.code) && drag.fromSem !== sem.code
               return (
                 <div key={sem.code} className="sem-block">
                   <div className="sem-hdr">
@@ -1149,13 +1303,34 @@ export default function Planner() {
                       {semPlan.cr} credit{semPlan.cr !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  <div className={`sem-body ${borderClass}`}>
+                  <div
+                    className={`sem-body ${borderClass} ${isValidDrop ? 'sem-drop-valid' : ''} ${isInvalidDrop ? 'sem-drop-invalid' : ''}`}
+                    onDragOver={(e) => {
+                      if (!drag) return
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = isValidDrop ? 'move' : 'none'
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      if (isValidDrop) handlePlanDrop(sem.code)
+                    }}
+                  >
                     {semPlan.courses.map((course) => (
                       <PlanCard
                         key={course.id}
                         course={course}
                         expanded={planExpanded.has(`${sem.code}-${course.id}`)}
                         onToggle={() => togglePlanExpanded(`${sem.code}-${course.id}`)}
+                        draggable
+                        isDragging={drag?.courseId === course.id}
+                        onDragStart={() => {
+                          setDropHint('')
+                          setDrag({ courseId: course.id, fromSem: sem.code })
+                        }}
+                        onDragEnd={() => {
+                          setDrag(null)
+                          setDropHint('')
+                        }}
                       />
                     ))}
                   </div>
@@ -1185,10 +1360,7 @@ export default function Planner() {
             ← Back
           </button>
           {state.step === 4 ? (
-            <button
-              className="btn btn-primary"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            >
+            <button className="btn btn-primary" onClick={recalculatePlan}>
               Recalculate →
             </button>
           ) : (

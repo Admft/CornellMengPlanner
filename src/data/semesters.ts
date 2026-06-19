@@ -39,3 +39,39 @@ export function semRange(start: string, end: string): Semester[] {
 export function relevantSemesters(): Semester[] {
   return SEMS.filter((semester) => semester.year >= 2022 && semester.year <= 2031)
 }
+
+/** Best guess at the upcoming semester for default selection. */
+export function defaultNextSemesterCode(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  const yy = String(year).slice(2)
+  const nextYy = String(year + 1).slice(2)
+  if (month <= 5) return `SU${yy}`
+  if (month <= 7) return `FA${yy}`
+  return `SP${nextYy}`
+}
+
+/** Semesters available for "next semester" — current term and onward. */
+export function planningSemesters(): Semester[] {
+  const anchor = defaultNextSemesterCode()
+  const anchorIdx = semIdx(anchor)
+  const startIdx = anchorIdx >= 0 ? Math.max(0, anchorIdx - 1) : 0
+  return SEMS.filter(
+    (semester) =>
+      semester.year >= 2022 &&
+      semester.year <= 2031 &&
+      semIdx(semester.code) >= startIdx,
+  )
+}
+
+export function graduationSemesters(planFromCode: string): Semester[] {
+  const fromIdx = semIdx(planFromCode)
+  if (fromIdx < 0) return planningSemesters()
+  return SEMS.filter(
+    (semester) =>
+      semester.year >= 2022 &&
+      semester.year <= 2031 &&
+      semIdx(semester.code) >= fromIdx,
+  )
+}
