@@ -21,6 +21,7 @@ export interface CustomTakenCourse {
   code: string
   name: string
   credits: number
+  cat: CourseCategory
   /** Optional semester taken — used for Excel export only. */
   semCode?: string
 }
@@ -74,6 +75,14 @@ export interface GeneratedPlan {
   unscheduled: Course[]
   sems: Semester[]
 }
+
+export const CUSTOM_COURSE_CATS: { value: CourseCategory; label: string }[] = [
+  { value: 'req', label: 'Core required' },
+  { value: 'cap', label: 'Capstone' },
+  { value: 'org', label: 'Org. behavior' },
+  { value: 'el', label: 'Elective' },
+  { value: 'res', label: 'Residential / PD' },
+]
 
 export const ADVISORS = [
   'Andrea Ippolito',

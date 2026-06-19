@@ -31,6 +31,7 @@ import {
 } from './lib/planLayout'
 import {
   ADVISORS,
+  CUSTOM_COURSE_CATS,
   DEFAULT_STATE,
   type Course,
   type CurriculumCatalog,
@@ -172,7 +173,13 @@ export default function Planner() {
   const [importError, setImportError] = useState('')
   const [importing, setImporting] = useState(false)
   const [showFeatureRequest, setShowFeatureRequest] = useState(false)
-  const [customDraft, setCustomDraft] = useState({ code: '', name: '', credits: '3' })
+  const [customDraft, setCustomDraft] = useState({
+    code: '',
+    name: '',
+    credits: '3',
+    cat: 'el' as CustomTakenCourse['cat'],
+    semCode: '',
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { curriculum } = state
@@ -334,12 +341,23 @@ export default function Planner() {
       code: customDraft.code.trim() || 'Custom',
       name: customDraft.name.trim(),
       credits,
+      cat: customDraft.cat,
+      semCode: customDraft.semCode || undefined,
     }
     setState((prev) => ({
       ...prev,
       customTaken: [...prev.customTaken, entry],
     }))
-    setCustomDraft({ code: '', name: '', credits: '3' })
+    setCustomDraft({ code: '', name: '', credits: '3', cat: 'el', semCode: '' })
+  }
+
+  function updateCustomTaken(id: string, patch: Partial<CustomTakenCourse>) {
+    setState((prev) => ({
+      ...prev,
+      customTaken: prev.customTaken.map((course) =>
+        course.id === id ? { ...course, ...patch } : course,
+      ),
+    }))
   }
 
   function removeCustomTaken(id: string) {
@@ -914,8 +932,8 @@ export default function Planner() {
                 <span className="info-icon">✏️</span>
                 <span>
                   If you took a course that was removed from the curriculum and
-                  isn&apos;t listed above, add it here with the credit amount from
-                  your transcript.
+                  isn&apos;t listed above, add it here. Set the type and semester
+                  so it lands in the right section on the Excel export.
                 </span>
               </div>
               {state.customTaken.length > 0 && (
@@ -925,6 +943,41 @@ export default function Planner() {
                       <span className="ci-code">{course.code}</span>
                       <span className="ci-name">{course.name}</span>
                       <span className="ci-cr">{course.credits} cr</span>
+                      <label className="custom-taken-field">
+                        <span className="custom-taken-lbl">Type</span>
+                        <select
+                          value={course.cat}
+                          onChange={(e) =>
+                            updateCustomTaken(course.id, {
+                              cat: e.target.value as CustomTakenCourse['cat'],
+                            })
+                          }
+                        >
+                          {CUSTOM_COURSE_CATS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="custom-taken-field">
+                        <span className="custom-taken-lbl">Taken in</span>
+                        <select
+                          value={course.semCode ?? ''}
+                          onChange={(e) =>
+                            updateCustomTaken(course.id, {
+                              semCode: e.target.value || undefined,
+                            })
+                          }
+                        >
+                          <option value="">Auto (export)</option>
+                          {takenSemOptions.map((sem) => (
+                            <option key={sem.code} value={sem.code}>
+                              {sem.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                       <button
                         type="button"
                         className="custom-remove"
@@ -974,6 +1027,42 @@ export default function Planner() {
                       setCustomDraft((prev) => ({ ...prev, credits: e.target.value }))
                     }
                   />
+                </div>
+                <div className="fg">
+                  <label htmlFor="customCat">Type</label>
+                  <select
+                    id="customCat"
+                    value={customDraft.cat}
+                    onChange={(e) =>
+                      setCustomDraft((prev) => ({
+                        ...prev,
+                        cat: e.target.value as CustomTakenCourse['cat'],
+                      }))
+                    }
+                  >
+                    {CUSTOM_COURSE_CATS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="fg">
+                  <label htmlFor="customSem">Taken in</label>
+                  <select
+                    id="customSem"
+                    value={customDraft.semCode}
+                    onChange={(e) =>
+                      setCustomDraft((prev) => ({ ...prev, semCode: e.target.value }))
+                    }
+                  >
+                    <option value="">Auto (export)</option>
+                    {takenSemOptions.map((sem) => (
+                      <option key={sem.code} value={sem.code}>
+                        {sem.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <button type="button" className="btn btn-secondary" onClick={addCustomTaken}>
                   + Add
@@ -1482,7 +1571,7 @@ export default function Planner() {
                       credits: course.credits,
                       seasons: [],
                       prereqs: [],
-                      cat: 'el',
+                      cat: course.cat,
                       pri: 4,
                       desc: 'Custom completed course (removed from current curriculum).',
                       notes: 'Added manually from your transcript.',

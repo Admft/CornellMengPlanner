@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 import { catalogToList } from '../data/courses'
+import { getCustomExcelPlacements } from './customExcel'
 import { getAllPlacements } from './planEngine'
 import type { GeneratedPlan, PlannerState } from '../types'
 import { SEM_COLS as COLS } from '../types'
@@ -72,6 +73,8 @@ export async function exportProposalExcel(
   }
 
   const placements = getAllPlacements(state, displayPlan)
+  const usedRows = new Set<number>()
+
   for (const placement of placements) {
     const row = resolveExcelRow(state, placement.course.id)
     if (!row || placement.semIndex < 0 || placement.semIndex >= COLS.length) {
@@ -79,6 +82,16 @@ export async function exportProposalExcel(
     }
     const col = COLS[placement.semIndex]
     sheet.getCell(`${col}${row}`).value = placement.course.credits
+    usedRows.add(row)
+  }
+
+  const customPlacements = getCustomExcelPlacements(state, usedRows, displayPlan)
+  for (const { custom, row, semIndex } of customPlacements) {
+    const col = COLS[semIndex]
+    sheet.getCell(`B${row}`).value = custom.code
+    sheet.getCell(`C${row}`).value = custom.name
+    sheet.getCell(`D${row}`).value = custom.credits
+    sheet.getCell(`${col}${row}`).value = custom.credits
   }
 
   const safeName = state.name.trim().replace(/\s+/g, '_') || 'MEM_Proposal'
