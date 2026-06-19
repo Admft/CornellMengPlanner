@@ -680,9 +680,9 @@ select:focus {
 
 .ci-export-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px 14px;
   flex-wrap: wrap;
   padding: 8px 13px 10px 36px;
   background: rgba(179, 27, 27, 0.04);
@@ -694,7 +694,7 @@ select:focus {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  flex: 1 1 180px;
+  flex: 1 1 140px;
 }
 
 .ci-export-sem-lbl {
@@ -711,16 +711,17 @@ select:focus {
 }
 
 .ci-export-sem-select {
-  font-size: 12px;
-  padding: 6px 8px;
+  font-size: 11.5px;
+  padding: 5px 28px 5px 8px;
   border: 1px solid var(--border);
   border-radius: var(--r);
   background: #fff;
   color: var(--text2);
-  min-width: 200px;
-  max-width: 100%;
+  width: auto;
+  max-width: 148px;
   cursor: pointer;
   flex-shrink: 0;
+  align-self: center;
 }
 
 .excel-sem-note {
@@ -1786,12 +1787,13 @@ input[type='range'].cr-range::-moz-range-thumb {
   .ci-export-row {
     padding-left: 12px;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
   }
 
   .ci-export-sem-select {
+    max-width: 100%;
     width: 100%;
-    min-width: 0;
+    align-self: stretch;
   }
 
   .ci-chev,

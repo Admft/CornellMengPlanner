@@ -72,7 +72,7 @@ export function CourseListItem({
             onChange={(e) => onTakenSemChange(e.target.value)}
             aria-label={`Which semester you took ${course.code} — optional, for Excel export only`}
           >
-            <option value="">Skip — not needed for planning</option>
+            <option value="">Skip</option>
             {takenSemOptions.map((sem) => (
               <option key={sem.code} value={sem.code}>
                 {sem.label}

@@ -810,8 +810,7 @@ export default function Planner() {
                   <strong>Only if you&apos;re downloading the Excel proposal:</strong> for
                   each course you check off, you can say which semester you took it so
                   it goes in the right column on Cornell&apos;s form. If you&apos;re just
-                  building a plan for yourself, leave every dropdown on{' '}
-                  <strong>Skip — not needed for planning</strong>.
+                  building a plan for yourself, leave every dropdown on <strong>Skip</strong>.
                 </span>
               </div>
             )}
@@ -976,7 +975,7 @@ export default function Planner() {
                           }
                           aria-label="Which semester you took this course — optional, for Excel export only"
                         >
-                          <option value="">Skip — not needed for planning</option>
+                          <option value="">Skip</option>
                           {takenSemOptions.map((sem) => (
                             <option key={sem.code} value={sem.code}>
                               {sem.label}
@@ -1065,7 +1064,7 @@ export default function Planner() {
                       setCustomDraft((prev) => ({ ...prev, semCode: e.target.value }))
                     }
                   >
-                    <option value="">Skip — not needed for planning</option>
+                    <option value="">Skip</option>
                     {takenSemOptions.map((sem) => (
                       <option key={sem.code} value={sem.code}>
                         {sem.label}
