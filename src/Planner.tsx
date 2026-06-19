@@ -804,11 +804,16 @@ export default function Planner() {
               to read its description and details.
             </p>
             {takenSemOptions.length > 0 && (
-              <p className="step-sub-hint">
-                Exporting to Excel? Expand a checked course to optionally set which
-                semester you took it — includes upcoming terms through{' '}
-                {takenSemOptions[takenSemOptions.length - 1]?.label ?? 'graduation'}.
-              </p>
+              <div className="info-row excel-sem-note">
+                <span className="info-icon">📄</span>
+                <span>
+                  <strong>Only if you&apos;re downloading the Excel proposal:</strong> for
+                  each course you check off, you can say which semester you took it so
+                  it goes in the right column on Cornell&apos;s form. If you&apos;re just
+                  building a plan for yourself, leave every dropdown on{' '}
+                  <strong>Skip — not needed for planning</strong>.
+                </span>
+              </div>
             )}
 
             <div className="card">
@@ -961,7 +966,7 @@ export default function Planner() {
                         </select>
                       </label>
                       <label className="custom-taken-field">
-                        <span className="custom-taken-lbl">Taken in</span>
+                        <span className="custom-taken-lbl">Semester taken</span>
                         <select
                           value={course.semCode ?? ''}
                           onChange={(e) =>
@@ -969,8 +974,9 @@ export default function Planner() {
                               semCode: e.target.value || undefined,
                             })
                           }
+                          aria-label="Which semester you took this course — optional, for Excel export only"
                         >
-                          <option value="">Auto (export)</option>
+                          <option value="">Skip — not needed for planning</option>
                           {takenSemOptions.map((sem) => (
                             <option key={sem.code} value={sem.code}>
                               {sem.label}
@@ -1047,8 +1053,11 @@ export default function Planner() {
                     ))}
                   </select>
                 </div>
-                <div className="fg">
-                  <label htmlFor="customSem">Taken in</label>
+                <div className="fg fg-narrow">
+                  <label htmlFor="customSem">
+                    Which semester?{' '}
+                    <span className="sec-note">(Excel only · optional)</span>
+                  </label>
                   <select
                     id="customSem"
                     value={customDraft.semCode}
@@ -1056,7 +1065,7 @@ export default function Planner() {
                       setCustomDraft((prev) => ({ ...prev, semCode: e.target.value }))
                     }
                   >
-                    <option value="">Auto (export)</option>
+                    <option value="">Skip — not needed for planning</option>
                     {takenSemOptions.map((sem) => (
                       <option key={sem.code} value={sem.code}>
                         {sem.label}

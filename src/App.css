@@ -678,6 +678,56 @@ select:focus {
   color: var(--text3);
 }
 
+.ci-export-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 13px 10px 36px;
+  background: rgba(179, 27, 27, 0.04);
+  border-top: 1px dashed var(--red-rule);
+}
+
+.ci-export-sem-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.ci-export-sem-lbl {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.ci-export-sem-hint {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.4;
+}
+
+.ci-export-sem-select {
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: #fff;
+  color: var(--text2);
+  min-width: 200px;
+  max-width: 100%;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.excel-sem-note {
+  margin-bottom: 18px;
+  font-size: 13px;
+}
+
 .ci-taken-sem-lbl {
   flex-shrink: 0;
 }
@@ -1731,6 +1781,17 @@ input[type='range'].cr-range::-moz-range-thumb {
     padding-left: 23px;
     font-size: 13px;
     line-height: 1.45;
+  }
+
+  .ci-export-row {
+    padding-left: 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ci-export-sem-select {
+    width: 100%;
+    min-width: 0;
   }
 
   .ci-chev,

@@ -32,7 +32,9 @@ export function CourseListItem({
       <div
         className="ci-hdr"
         onClick={(event) => {
-          if ((event.target as HTMLElement).matches('input')) return
+          const target = event.target as HTMLElement
+          if (target.matches('input, select, option')) return
+          if (target.closest('.ci-export-row')) return
           onToggle()
         }}
       >
@@ -52,28 +54,38 @@ export function CourseListItem({
         <span className="ci-cr">{course.credits} cr</span>
         <span className="ci-chev">▼</span>
       </div>
+      {checked && onTakenSemChange && takenSemOptions && takenSemOptions.length > 0 && (
+        <div
+          className="ci-export-row"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="ci-export-sem-copy">
+            <span className="ci-export-sem-lbl">Which semester did you take this?</span>
+            <span className="ci-export-sem-hint">
+              Optional — only used when you download the Excel proposal. Leave on skip if
+              you&apos;re just planning.
+            </span>
+          </div>
+          <select
+            className="ci-export-sem-select"
+            value={takenSem ?? ''}
+            onChange={(e) => onTakenSemChange(e.target.value)}
+            aria-label={`Which semester you took ${course.code} — optional, for Excel export only`}
+          >
+            <option value="">Skip — not needed for planning</option>
+            {takenSemOptions.map((sem) => (
+              <option key={sem.code} value={sem.code}>
+                {sem.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="ci-body">
         <p className="ci-desc">{course.desc}</p>
         <p className="ci-notes">{course.notes}</p>
         {hasPrereqs && (
           <p className="ci-prereq">Prerequisites: {course.prereqs.join(', ')}</p>
-        )}
-        {checked && onTakenSemChange && takenSemOptions && takenSemOptions.length > 0 && (
-          <label className="ci-taken-sem">
-            <span className="ci-taken-sem-lbl">Taken in</span>
-            <select
-              value={takenSem ?? ''}
-              onChange={(e) => onTakenSemChange(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <option value="">Auto (export)</option>
-              {takenSemOptions.map((sem) => (
-                <option key={sem.code} value={sem.code}>
-                  {sem.label}
-                </option>
-              ))}
-            </select>
-          </label>
         )}
       </div>
     </div>
