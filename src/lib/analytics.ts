@@ -1,14 +1,17 @@
-/** Free public counter API — no account or API key required. https://countapi.xyz */
+/**
+ * Anonymous usage counters — no account or API key required.
+ * countapi.xyz shut down; this uses the community replacement at countapi.mileshilliard.com
+ */
 
-const NAMESPACE = 'cornell-meng-planner'
+const API_BASE = 'https://countapi.mileshilliard.com/api/v1'
 
 export const COUNTERS = {
-  visits: 'visits',
-  mobile: 'device-mobile',
-  tablet: 'device-tablet',
-  desktop: 'device-desktop',
-  statsViews: 'stats-page-views',
-  excelExports: 'excel-exports',
+  visits: 'cornell-meng-planner-visits',
+  mobile: 'cornell-meng-planner-device-mobile',
+  tablet: 'cornell-meng-planner-device-tablet',
+  desktop: 'cornell-meng-planner-device-desktop',
+  statsViews: 'cornell-meng-planner-stats-page-views',
+  excelExports: 'cornell-meng-planner-excel-exports',
 } as const
 
 export type DeviceType = 'mobile' | 'tablet' | 'desktop'
@@ -23,7 +26,20 @@ const SESSION_VISIT_KEY = 'mem-planner-visit-recorded'
 const API_TIMEOUT_MS = 8000
 
 function apiUrl(action: 'hit' | 'get', key: string) {
-  return `https://api.countapi.xyz/${action}/${NAMESPACE}/${key}`
+  return `${API_BASE}/${action}/${key}`
+}
+
+function parseValue(data: unknown): number | null {
+  if (!data || typeof data !== 'object') return null
+  const record = data as { value?: unknown; error?: string }
+  if (record.error === 'Key not found') return 0
+  const raw = record.value
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  if (typeof raw === 'string') {
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
 }
 
 async function fetchCount(action: 'hit' | 'get', key: string): Promise<number | null> {
@@ -33,8 +49,8 @@ async function fetchCount(action: 'hit' | 'get', key: string): Promise<number | 
     const response = await fetch(apiUrl(action, key), { signal: controller.signal })
     clearTimeout(timer)
     if (!response.ok) return null
-    const data = (await response.json()) as { value?: number }
-    return typeof data.value === 'number' ? data.value : null
+    const data = await response.json()
+    return parseValue(data)
   } catch {
     return null
   }

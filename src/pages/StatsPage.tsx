@@ -82,7 +82,7 @@ export default function StatsPage() {
         data.desktop == null
       ) {
         setError(
-          'CountAPI is unreachable right now. Stats will appear once the service is back.',
+          'Stats service is unreachable right now. Try refreshing in a moment.',
         )
       }
     } catch {
@@ -116,11 +116,8 @@ export default function StatsPage() {
           <div>
             <h1 className="step-title">Planner usage</h1>
             <p className="step-sub">
-              Anonymous session counts via{' '}
-              <a href="https://countapi.xyz" target="_blank" rel="noreferrer">
-                CountAPI
-              </a>
-              . One visit per browser session; device type from your user agent.
+              Anonymous session counts via a public counter API (no signup required).
+              One visit per browser session; device type from your user agent.
             </p>
           </div>
           <button

@@ -44,7 +44,7 @@ Note: Vercel limits upload size to ~4.5 MB per request, so attachments are cappe
 - 4-step wizard: timeline, courses taken, remaining choices, personalized plan
 - Automatic semester scheduling with prerequisite and credit-limit rules
 - **Export Excel** on the final step — fills `Cornellproposal.xlsx` with your name, NetID, advisor, start/graduation semesters, and course credits per semester column
-- **`/stats` page** — anonymous usage stats (sessions, device breakdown, Excel exports) via [CountAPI](https://countapi.xyz) — no account or API key needed
+- **`/stats` page** — anonymous usage stats (sessions, device breakdown, Excel exports) via a free public counter API — no account or API key needed
 
 ## Usage stats (`/stats`)
 
