@@ -69,6 +69,13 @@ body {
   min-width: 0;
 }
 
+.hdr-logo {
+  height: 32px;
+  width: auto;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
 .hdr-request {
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.14);
@@ -1563,8 +1570,13 @@ input[type='range'].cr-range::-moz-range-thumb {
   .hdr-brand {
     flex: 1 1 auto;
     min-width: 0;
-    align-items: baseline;
+    align-items: center;
     line-height: 1.3;
+  }
+
+  .hdr-logo {
+    height: 26px;
+    margin-right: 8px;
   }
 
   .hdr-word {

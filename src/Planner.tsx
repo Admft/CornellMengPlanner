@@ -417,6 +417,11 @@ export default function Planner() {
       <div className="sticky-top">
         <header className="hdr">
           <div className="hdr-brand">
+            <img
+              src="/Cornell_University_seal.svg.png"
+              alt="Cornell University"
+              className="hdr-logo"
+            />
             <span className="hdr-word">Cornell Engineering</span>
             <span className="hdr-sep">|</span>
             <span className="hdr-app hdr-app-full">M.Eng. Management · Course Planner</span>
