@@ -106,10 +106,12 @@ export default function StatsPage() {
         <div className="hdr-brand">
           <span className="hdr-word">Cornell Engineering</span>
           <span className="hdr-sep">|</span>
-          <span className="hdr-app">M.Eng. Management · Usage Stats</span>
+          <span className="hdr-app hdr-app-full">M.Eng. Management · Usage Stats</span>
+          <span className="hdr-app hdr-app-short">· Usage Stats</span>
         </div>
         <Link to="/" className="hdr-request">
-          ← Back to planner
+          <span className="hdr-request-full">← Back to planner</span>
+          <span className="hdr-request-short">← Planner</span>
         </Link>
       </header>
 

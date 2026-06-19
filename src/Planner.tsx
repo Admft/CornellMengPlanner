@@ -75,7 +75,12 @@ interface AppState {
   returningStudent: boolean
 }
 
-const STEPS = ['Timeline', 'Courses Taken', 'Your Choices', 'Your Plan']
+const STEPS = [
+  { label: 'Timeline', short: 'Timeline' },
+  { label: 'Courses Taken', short: 'Taken' },
+  { label: 'Your Choices', short: 'Choices' },
+  { label: 'Your Plan', short: 'Plan' },
+] as const
 const EL_MIN = 2
 
 function CourseList({
@@ -409,47 +414,54 @@ export default function Planner() {
 
   return (
     <>
-      <header className="hdr">
-        <div className="hdr-brand">
-          <span className="hdr-word">Cornell Engineering</span>
-          <span className="hdr-sep">|</span>
-          <span className="hdr-app">M.Eng. Management · Course Planner</span>
-        </div>
-        <div className="hdr-actions">
-          <Link to="/stats" className="hdr-link">
-            Stats
-          </Link>
-          <button
-            type="button"
-            className="hdr-request"
-            onClick={() => setShowFeatureRequest(true)}
-          >
-            Request a change
-          </button>
-        </div>
-      </header>
+      <div className="sticky-top">
+        <header className="hdr">
+          <div className="hdr-brand">
+            <span className="hdr-word">Cornell Engineering</span>
+            <span className="hdr-sep">|</span>
+            <span className="hdr-app hdr-app-full">M.Eng. Management · Course Planner</span>
+            <span className="hdr-app hdr-app-short">· MEM Course Planner</span>
+          </div>
+          <div className="hdr-actions">
+            <Link to="/stats" className="hdr-link">
+              Stats
+            </Link>
+            <button
+              type="button"
+              className="hdr-request"
+              onClick={() => setShowFeatureRequest(true)}
+            >
+              <span className="hdr-request-full">Request a change</span>
+              <span className="hdr-request-short">Feedback</span>
+            </button>
+          </div>
+        </header>
+
+        <nav className="pnav">
+          {STEPS.map((step, index) => {
+            const stepNum = index + 1
+            const isActive = state.step === stepNum
+            const isDone = state.step > stepNum
+            return (
+              <div
+                key={step.label}
+                className={`pstep ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}
+              >
+                <div className="pstep-num">{isDone ? '✓' : stepNum}</div>
+                <div className="pstep-lbl">
+                  <span className="pstep-lbl-full">{step.label}</span>
+                  <span className="pstep-lbl-short">{step.short}</span>
+                </div>
+              </div>
+            )
+          })}
+        </nav>
+      </div>
 
       <FeatureRequestModal
         open={showFeatureRequest}
         onClose={() => setShowFeatureRequest(false)}
       />
-
-      <nav className="pnav">
-        {STEPS.map((label, index) => {
-          const stepNum = index + 1
-          const isActive = state.step === stepNum
-          const isDone = state.step > stepNum
-          return (
-            <div
-              key={label}
-              className={`pstep ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}
-            >
-              <div className="pstep-num">{isDone ? '✓' : stepNum}</div>
-              <div className="pstep-lbl">{label}</div>
-            </div>
-          )
-        })}
-      </nav>
 
       <main className="main">
         {state.step === 1 && (
