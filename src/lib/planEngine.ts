@@ -6,8 +6,9 @@ import {
   prereqsSatisfied,
 } from '../data/courses'
 import { LEGACY_COURSES } from '../data/legacyCourses'
-import { semRange } from '../data/semesters'
+import { excelSemesters, semIdx, semRange, autoPlaceSemesters } from '../data/semesters'
 import type { Course, CurriculumCatalog, GeneratedPlan, PlannerState, SemesterPlan } from '../types'
+import { SEM_COLS } from '../types'
 import { MIN_DEGREE_CREDITS } from './planLayout'
 
 export interface CoursePlacement {
@@ -198,7 +199,13 @@ export function getAllPlacements(
   state: PlannerState,
   displayPlan?: GeneratedPlan,
 ): CoursePlacement[] {
-  const { plan, sems } = displayPlan ?? generatePlan(state)
+  const { plan } = displayPlan ?? generatePlan(state)
+  const excelSems = excelSemesters(
+    state.programStartSem,
+    state.planFromSem,
+    state.gradSem,
+    SEM_COLS.length,
+  )
   const placements: CoursePlacement[] = []
   const done = new Set<string>()
   const semLoads = new Map<string, number>()
@@ -214,16 +221,37 @@ export function getAllPlacements(
     .sort((a, b) => a.pri - b.pri)
 
   for (const course of takenCourses) {
-    const semIndex = sems.findIndex((sem) => {
-      if (!course.seasons.includes(sem.season)) return false
-      if (!prereqsSatisfied(course.prereqs ?? [], done, completionCtx(state))) return false
-      const load = semLoads.get(sem.code) ?? 0
-      const limit = limits[sem.season] ?? 12
-      return load + course.credits <= limit
-    })
+    const explicitSem = state.takenSemesters[course.id]
+    let semIndex = -1
+
+    if (explicitSem) {
+      semIndex = excelSems.findIndex((sem) => sem.code === explicitSem)
+    } else {
+      const planFromIdx = semIdx(state.planFromSem)
+      const pastSems = autoPlaceSemesters(state.programStartSem, state.planFromSem)
+      const autoSems =
+        pastSems.length > 0
+          ? pastSems
+          : excelSems.filter((sem) => {
+              const idx = semIdx(sem.code)
+              return planFromIdx >= 0 && idx >= 0 && idx < planFromIdx
+            })
+
+      const matchedSem = autoSems.find((sem) => {
+        if (!course.seasons.includes(sem.season)) return false
+        if (!prereqsSatisfied(course.prereqs ?? [], done, completionCtx(state))) return false
+        const load = semLoads.get(sem.code) ?? 0
+        const limit = limits[sem.season] ?? 12
+        return load + course.credits <= limit
+      })
+
+      if (matchedSem) {
+        semIndex = excelSems.findIndex((sem) => sem.code === matchedSem.code)
+      }
+    }
 
     if (semIndex >= 0) {
-      const sem = sems[semIndex]
+      const sem = excelSems[semIndex]
       placements.push({
         course,
         semCode: sem.code,
@@ -234,11 +262,12 @@ export function getAllPlacements(
     }
   }
 
-  for (const sem of sems) {
+  for (const sem of excelSems) {
     const semPlan = plan[sem.code]
     if (!semPlan) continue
-    const semIndex = sems.findIndex((item) => item.code === sem.code)
+    const semIndex = excelSems.findIndex((item) => item.code === sem.code)
     for (const course of semPlan.courses) {
+      if (done.has(course.id)) continue
       placements.push({ course, semCode: sem.code, semIndex })
       done.add(course.id)
     }

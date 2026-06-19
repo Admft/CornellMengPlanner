@@ -406,6 +406,13 @@ body {
   line-height: 1.65;
 }
 
+.step-sub-hint {
+  font-size: 12px;
+  color: var(--text3);
+  margin: -18px 0 26px;
+  line-height: 1.5;
+}
+
 .plan-header-row {
   display: flex;
   align-items: baseline;
@@ -658,6 +665,31 @@ select:focus {
   font-size: 11.5px;
   color: #b85000;
   margin-top: 5px;
+}
+
+.ci-taken-sem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 11.5px;
+  color: var(--text3);
+}
+
+.ci-taken-sem-lbl {
+  flex-shrink: 0;
+}
+
+.ci-taken-sem select {
+  font-size: 11.5px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text2);
+  max-width: 160px;
 }
 
 .prereq-pill {

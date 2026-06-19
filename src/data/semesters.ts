@@ -1,9 +1,12 @@
 import type { Semester } from '../types'
 
 const SEM_FIRST_YEAR = 2020
-const SEM_LAST_YEAR = 2032
+/** Built through this year so the app stays usable without frequent updates. */
+const SEM_LAST_YEAR = Math.max(2032, new Date().getFullYear() + 5)
 /** Earliest semester in the program-start dropdown (Excel export). */
 const PROGRAM_START_FIRST_CODE = 'SP24'
+/** How many calendar years of terms to offer in the "taken in" picker. */
+const TAKEN_SEM_YEARS = 3
 
 export const SEMS: Semester[] = (() => {
   const result: Semester[] = []
@@ -81,6 +84,39 @@ export function planningSemesters(): Semester[] {
       semester.year <= SEM_LAST_YEAR &&
       semIdx(semester.code) >= startIdx,
   )
+}
+
+/** Semesters offered in the optional "taken in" picker (Step 2 / Excel export). */
+export function takenSemesterOptions(programStart: string): Semester[] {
+  const start = programStart.trim() || PROGRAM_START_FIRST_CODE
+  const startIdx = semIdx(start)
+  if (startIdx < 0) return []
+  const endYear = Math.min(SEMS[startIdx].year + TAKEN_SEM_YEARS, SEM_LAST_YEAR)
+  return SEMS.filter(
+    (semester) =>
+      semIdx(semester.code) >= startIdx && semester.year <= endYear,
+  )
+}
+
+/** Semesters used when auto-placing completed courses on export (through next semester). */
+export function autoPlaceSemesters(programStart: string, planFrom: string): Semester[] {
+  const start = programStart.trim() || PROGRAM_START_FIRST_CODE
+  const startIdx = semIdx(start)
+  const planIdx = semIdx(planFrom)
+  if (startIdx < 0 || planIdx < 0) return []
+  return SEMS.slice(startIdx, planIdx + 1)
+}
+
+/** Semester columns on the official proposal spreadsheet (E–P). */
+export function excelSemesters(
+  programStart: string,
+  planFrom: string,
+  grad: string,
+  maxCols = 12,
+): Semester[] {
+  const start = programStart.trim() || planFrom
+  const range = semRange(start, grad)
+  return range.slice(0, maxCols)
 }
 
 export function graduationSemesters(planFromCode: string): Semester[] {

@@ -1,4 +1,4 @@
-import type { Course } from '../types'
+import type { Course, Semester } from '../types'
 
 interface CourseListItemProps {
   course: Course
@@ -8,6 +8,9 @@ interface CourseListItemProps {
   onChange: (checked: boolean) => void
   expanded: boolean
   onToggle: () => void
+  takenSem?: string
+  takenSemOptions?: Semester[]
+  onTakenSemChange?: (semCode: string) => void
 }
 
 export function CourseListItem({
@@ -18,6 +21,9 @@ export function CourseListItem({
   onChange,
   expanded,
   onToggle,
+  takenSem,
+  takenSemOptions,
+  onTakenSemChange,
 }: CourseListItemProps) {
   const hasPrereqs = course.prereqs.length > 0
 
@@ -51,6 +57,23 @@ export function CourseListItem({
         <p className="ci-notes">{course.notes}</p>
         {hasPrereqs && (
           <p className="ci-prereq">Prerequisites: {course.prereqs.join(', ')}</p>
+        )}
+        {checked && onTakenSemChange && takenSemOptions && takenSemOptions.length > 0 && (
+          <label className="ci-taken-sem">
+            <span className="ci-taken-sem-lbl">Taken in</span>
+            <select
+              value={takenSem ?? ''}
+              onChange={(e) => onTakenSemChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <option value="">Auto (export)</option>
+              {takenSemOptions.map((sem) => (
+                <option key={sem.code} value={sem.code}>
+                  {sem.label}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
       </div>
     </div>

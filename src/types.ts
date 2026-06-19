@@ -21,6 +21,8 @@ export interface CustomTakenCourse {
   code: string
   name: string
   credits: number
+  /** Optional semester taken — used for Excel export only. */
+  semCode?: string
 }
 
 export interface CurriculumCatalog {
@@ -50,6 +52,8 @@ export interface PlannerState {
   gradSem: string
   crLimit: number
   taken: Set<string>
+  /** Optional per-course semester taken — Excel export only. */
+  takenSemesters: Record<string, string>
   obChoice: string
   elChoices: Set<string>
   resChoice: 'session2' | 'workshops'
@@ -105,6 +109,7 @@ export const DEFAULT_STATE: Omit<PlannerState, 'curriculum' | 'planFromSem'> & {
   gradSem: 'SP28',
   crLimit: 8,
   taken: new Set(),
+  takenSemesters: {},
   obChoice: '',
   elChoices: new Set(),
   resChoice: 'session2',

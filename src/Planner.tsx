@@ -12,7 +12,7 @@ import {
   seasonKey,
 } from './data/courses'
 import { LEGACY_COURSES } from './data/legacyCourses'
-import { graduationSemesters, defaultNextSemesterCode, planningSemesters, programStartSemesters, semIdx } from './data/semesters'
+import { graduationSemesters, defaultNextSemesterCode, planningSemesters, programStartSemesters, semIdx, takenSemesterOptions } from './data/semesters'
 import { importCurriculumFromXlsx } from './lib/curriculumImport'
 import { exportProposalExcel } from './lib/excelExport'
 import {
@@ -44,6 +44,7 @@ function toPlannerState(state: AppState): PlannerState {
   return {
     ...state,
     taken: new Set(state.taken),
+    takenSemesters: state.takenSemesters,
     elChoices: new Set(state.elChoices),
     customTaken: state.customTaken,
     curriculum: state.curriculum,
@@ -65,6 +66,7 @@ interface AppState {
   gradSem: string
   crLimit: number
   taken: string[]
+  takenSemesters: Record<string, string>
   obChoice: string
   elChoices: string[]
   resChoice: 'session2' | 'workshops'
@@ -91,6 +93,9 @@ function CourseList({
   onToggle,
   expanded,
   onExpand,
+  takenSemesters,
+  takenSemOptions,
+  onTakenSemChange,
 }: {
   courses: Course[]
   inputType: 'checkbox' | 'radio'
@@ -99,6 +104,9 @@ function CourseList({
   onToggle: (id: string, checked: boolean) => void
   expanded: Set<string>
   onExpand: (id: string) => void
+  takenSemesters?: Record<string, string>
+  takenSemOptions?: ReturnType<typeof takenSemesterOptions>
+  onTakenSemChange?: (id: string, semCode: string) => void
 }) {
   return (
     <div className="clist">
@@ -117,6 +125,13 @@ function CourseList({
             onChange={(value) => onToggle(course.id, value)}
             expanded={expanded.has(course.id)}
             onToggle={() => onExpand(course.id)}
+            takenSem={takenSemesters?.[course.id]}
+            takenSemOptions={takenSemOptions}
+            onTakenSemChange={
+              onTakenSemChange
+                ? (semCode) => onTakenSemChange(course.id, semCode)
+                : undefined
+            }
           />
         )
       })}
@@ -136,6 +151,7 @@ export default function Planner() {
     gradSem: DEFAULT_STATE.gradSem,
     crLimit: DEFAULT_STATE.crLimit,
     taken: [],
+    takenSemesters: {},
     obChoice: DEFAULT_STATE.obChoice,
     elChoices: [],
     resChoice: DEFAULT_STATE.resChoice,
@@ -186,6 +202,10 @@ export default function Planner() {
     () => graduationSemesters(state.planFromSem),
     [state.planFromSem],
   )
+  const takenSemOptions = useMemo(
+    () => takenSemesterOptions(state.programStartSem),
+    [state.programStartSem],
+  )
 
   const takenSet = useMemo(() => new Set(state.taken), [state.taken])
   const elSet = useMemo(() => new Set(state.elChoices), [state.elChoices])
@@ -234,7 +254,24 @@ export default function Planner() {
         taken = taken.filter((item) => item !== 'EN5930_legacy')
       }
 
-      return { ...prev, taken, planLayout: null }
+      const takenSemesters = { ...prev.takenSemesters }
+      if (!checked) {
+        delete takenSemesters[id]
+      }
+
+      return { ...prev, taken, takenSemesters, planLayout: null }
+    })
+  }
+
+  function setTakenSem(id: string, semCode: string) {
+    setState((prev) => {
+      const takenSemesters = { ...prev.takenSemesters }
+      if (semCode) {
+        takenSemesters[id] = semCode
+      } else {
+        delete takenSemesters[id]
+      }
+      return { ...prev, takenSemesters }
     })
   }
 
@@ -608,9 +645,9 @@ export default function Planner() {
                     ))}
                   </select>
                   <span className="hint">
-                    Only for the official proposal form&apos;s &quot;Starting&quot; field.
-                    Includes past semesters back to Spring 2024. Leave
-                    blank if you&apos;re just planning ahead.
+                    When you started the MEM program — sets the first Excel column and
+                    where completed courses are placed. Pick your real start term if
+                    you&apos;ve already taken classes (back to Spring 2024).
                   </span>
                 </div>
               </div>
@@ -748,6 +785,13 @@ export default function Planner() {
               Check every course you&apos;ve finished. Click the ▼ on any course
               to read its description and details.
             </p>
+            {takenSemOptions.length > 0 && (
+              <p className="step-sub-hint">
+                Exporting to Excel? Expand a checked course to optionally set which
+                semester you took it — includes upcoming terms through{' '}
+                {takenSemOptions[takenSemOptions.length - 1]?.label ?? 'graduation'}.
+              </p>
+            )}
 
             <div className="card">
               <div className="sec-label">Required Core Courses</div>
@@ -777,6 +821,9 @@ export default function Planner() {
                 expanded={expanded}
                 onExpand={toggleExpanded}
                 onToggle={toggleTaken}
+                takenSemesters={state.takenSemesters}
+                takenSemOptions={takenSemOptions}
+                onTakenSemChange={setTakenSem}
               />
             </div>
 
@@ -793,6 +840,9 @@ export default function Planner() {
                 expanded={expanded}
                 onExpand={toggleExpanded}
                 onToggle={toggleTaken}
+                takenSemesters={state.takenSemesters}
+                takenSemOptions={takenSemOptions}
+                onTakenSemChange={setTakenSem}
               />
             </div>
 
@@ -808,14 +858,10 @@ export default function Planner() {
                 selected={takenSet}
                 expanded={expanded}
                 onExpand={toggleExpanded}
-                onToggle={(id, checked) =>
-                  setState((prev) => ({
-                    ...prev,
-                    taken: checked
-                      ? [...prev.taken, id]
-                      : prev.taken.filter((item) => item !== id),
-                  }))
-                }
+                onToggle={toggleTaken}
+                takenSemesters={state.takenSemesters}
+                takenSemOptions={takenSemOptions}
+                onTakenSemChange={setTakenSem}
               />
             </div>
 
@@ -828,14 +874,10 @@ export default function Planner() {
                 selected={takenSet}
                 expanded={expanded}
                 onExpand={toggleExpanded}
-                onToggle={(id, checked) =>
-                  setState((prev) => ({
-                    ...prev,
-                    taken: checked
-                      ? [...prev.taken, id]
-                      : prev.taken.filter((item) => item !== id),
-                  }))
-                }
+                onToggle={toggleTaken}
+                takenSemesters={state.takenSemesters}
+                takenSemOptions={takenSemOptions}
+                onTakenSemChange={setTakenSem}
               />
             </div>
 
@@ -860,6 +902,9 @@ export default function Planner() {
                 expanded={expanded}
                 onExpand={toggleExpanded}
                 onToggle={toggleTaken}
+                takenSemesters={state.takenSemesters}
+                takenSemOptions={takenSemOptions}
+                onTakenSemChange={setTakenSem}
               />
             </div>
 

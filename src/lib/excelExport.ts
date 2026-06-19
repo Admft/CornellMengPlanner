@@ -9,6 +9,18 @@ function resolveExcelRow(state: PlannerState, courseId: string): number | undefi
   return course?.excelRow
 }
 
+/** Cornell's template totals each sum every column; fix per-semester SUMs before export. */
+function patchTemplateFormulas(sheet: ExcelJS.Worksheet) {
+  for (const col of COLS) {
+    sheet.getCell(`${col}25`).value = { formula: `SUM(${col}13:${col}24)` }
+    sheet.getCell(`${col}33`).value = { formula: `SUM(${col}29:${col}32)` }
+    sheet.getCell(`${col}49`).value = { formula: `SUM(${col}36:${col}48)` }
+  }
+  for (const col of ['H', 'I', 'J'] as const) {
+    sheet.getCell(`${col}52`).value = { formula: 'SUM(E50:P50)' }
+  }
+}
+
 function downloadBuffer(buffer: ArrayBuffer, filename: string) {
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -46,6 +58,8 @@ export async function exportProposalExcel(
   sheet.getCell('G4').value = state.programStartSem.trim() || state.planFromSem
   sheet.getCell('G5').value = state.gradSem
   sheet.getCell('G6').value = state.advisor
+
+  patchTemplateFormulas(sheet)
 
   const courseRows = catalogToList(state.curriculum)
     .map((c) => c.excelRow)
