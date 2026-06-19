@@ -10,11 +10,11 @@ cp .env.example .env   # then add SMTP credentials (see below)
 npm run dev
 ```
 
-Open the URL shown in the terminal (usually `http://localhost:5173`). The dev script starts both the web app and the API server.
+Open the URL shown in the terminal (usually `http://localhost:5173`). The request form API runs inside the Vite dev server — no second process needed.
 
 ### Feature requests (email)
 
-The **Request a change** button sends email through a small server-side API. Recipient addresses live only in `.env` on the server — they are never included in the frontend bundle.
+The **Request a change** button sends email through a server-side API. Recipient addresses live only in `.env` on the server — they are never included in the frontend bundle.
 
 Set these in `.env`:
 
@@ -22,7 +22,9 @@ Set these in `.env`:
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` — mail server (Gmail app password works)
 - `SMTP_FROM` — optional From header
 
-Production: run `npm run build && npm start` to serve the app and API together on one port.
+Until SMTP is configured, the form returns a clear setup message instead of a generic error.
+
+Production (self-hosted): run `npm run build && npm start` to serve the app and API together on one port.
 
 ### Deploy to Vercel
 

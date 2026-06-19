@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
 import formidable from 'formidable'
 import {
-  MAX_FILE_BYTES,
-  MAX_FILES,
   cleanText,
   fieldValue,
+  MAX_FILE_BYTES,
+  MAX_FILES,
   sendFeatureRequestEmail,
 } from '../server/featureRequestCore.js'
 
@@ -41,7 +41,8 @@ export default async function handler(req, res) {
     if (error.code === 'NOT_CONFIGURED') {
       res.status(503).json({
         ok: false,
-        error: 'Request delivery is not configured on the server yet.',
+        error:
+          'Email is not configured yet. Add SMTP settings in Vercel environment variables.',
       })
       return
     }
@@ -53,6 +54,13 @@ export default async function handler(req, res) {
       res.status(413).json({
         ok: false,
         error: 'Attachments are too large. Keep total upload under 4 MB.',
+      })
+      return
+    }
+    if (error.code === 'EAUTH' || error.code === 'ESOCKET') {
+      res.status(503).json({
+        ok: false,
+        error: 'Email server login failed. Check SMTP credentials.',
       })
       return
     }
