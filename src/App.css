@@ -117,6 +117,17 @@ body {
   margin: 0;
 }
 
+.plan-grad-select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  min-width: 160px;
+}
+
 .stats-main {
   max-width: 720px;
 }

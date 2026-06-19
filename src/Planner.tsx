@@ -11,7 +11,7 @@ import {
   seasonKey,
 } from './data/courses'
 import { LEGACY_COURSES } from './data/legacyCourses'
-import { graduationSemesters, defaultNextSemesterCode, planningSemesters, semIdx } from './data/semesters'
+import { graduationSemesters, defaultNextSemesterCode, planningSemesters, programStartSemesters, semIdx } from './data/semesters'
 import { importCurriculumFromXlsx } from './lib/curriculumImport'
 import { exportProposalExcel } from './lib/excelExport'
 import {
@@ -175,6 +175,7 @@ export default function Planner() {
   }, [basePlan, state.planLayout, state.curriculum])
   const credits = useMemo(() => getCreditTotals(planner, plan), [planner, plan])
   const planSemesterOptions = useMemo(() => planningSemesters(), [])
+  const programStartOptions = useMemo(() => programStartSemesters(), [])
   const gradSemesterOptions = useMemo(
     () => graduationSemesters(state.planFromSem),
     [state.planFromSem],
@@ -582,7 +583,7 @@ export default function Planner() {
                     }
                   >
                     <option value="">Same as next semester</option>
-                    {planSemesterOptions.map((sem) => (
+                    {programStartOptions.map((sem) => (
                       <option key={sem.code} value={sem.code}>
                         {sem.label}
                       </option>
@@ -590,7 +591,8 @@ export default function Planner() {
                   </select>
                   <span className="hint">
                     Only for the official proposal form&apos;s &quot;Starting&quot; field.
-                    Leave blank if you&apos;re just planning ahead.
+                    Includes past semesters (2020 onward) if you started earlier. Leave
+                    blank if you&apos;re just planning ahead.
                   </span>
                 </div>
               </div>
@@ -629,7 +631,8 @@ export default function Planner() {
                 Per Cornell&apos;s Fall 2026 curriculum update: returning students are{' '}
                 <strong>not required</strong> to take ENMGT 5405 Applied AI (the email
                 lists 5404 — same new AI requirement). Incoming students must take it.
-                If you already completed ENMGT 5930 and ENMGT 5940, mark those in Step 2
+                If you already completed ENMGT 5930 (Data Analytics) and ENMGT 5940
+                (Economics and Finance for Engineering Management), mark those in Step 2
                 and the split/credit changes don&apos;t apply to you.
               </p>
             </div>
@@ -1167,8 +1170,9 @@ export default function Planner() {
               <div className="alert alert-ok">
                 <span className="alert-icon">✓</span>
                 <div>
-                  You&apos;ve already taken ENMGT 5930 and ENMGT 5940 (or their
-                  equivalents) — Cornell says you can disregard the split/credit changes.
+                  You&apos;ve already taken ENMGT 5930 (Data Analytics) and ENMGT 5940
+                  (Economics and Finance for Engineering Management) — Cornell says you
+                  can disregard the split/credit changes.
                 </div>
               </div>
             )}
@@ -1308,6 +1312,33 @@ export default function Planner() {
                 <span>{credits.takenCredits} already completed</span>
                 <span>{credits.plannedCredits} in plan</span>
                 <span>30 minimum</span>
+              </div>
+              <div className="cr-plan-row">
+                <span className="cr-plan-lbl">Graduate by:</span>
+                <select
+                  id="gradSemPlan"
+                  className="plan-grad-select"
+                  value={state.gradSem}
+                  onChange={(e) => {
+                    const gradSem = e.target.value
+                    if (semIdx(gradSem) < semIdx(state.planFromSem)) return
+                    setState((prev) => ({
+                      ...prev,
+                      gradSem,
+                      planLayout: null,
+                    }))
+                  }}
+                >
+                  {gradSemesterOptions.map((sem) => (
+                    <option key={sem.code} value={sem.code}>
+                      {sem.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="cr-plan-note">
+                  Change target graduation — e.g. Fall 2028 vs Spring 2028 — and the
+                  schedule updates automatically
+                </span>
               </div>
               <div className="cr-plan-row">
                 <span className="cr-plan-lbl">Credits per semester:</span>

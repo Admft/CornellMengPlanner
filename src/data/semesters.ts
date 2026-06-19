@@ -1,8 +1,11 @@
 import type { Semester } from '../types'
 
+const SEM_FIRST_YEAR = 2020
+const SEM_LAST_YEAR = 2032
+
 export const SEMS: Semester[] = (() => {
   const result: Semester[] = []
-  for (let year = 2022; year <= 2031; year++) {
+  for (let year = SEM_FIRST_YEAR; year <= SEM_LAST_YEAR; year++) {
     result.push({
       code: `SP${String(year).slice(2)}`,
       season: 'Spring',
@@ -37,7 +40,16 @@ export function semRange(start: string, end: string): Semester[] {
 }
 
 export function relevantSemesters(): Semester[] {
-  return SEMS.filter((semester) => semester.year >= 2022 && semester.year <= 2031)
+  return SEMS.filter(
+    (semester) => semester.year >= SEM_FIRST_YEAR && semester.year <= SEM_LAST_YEAR,
+  )
+}
+
+/** All semesters for program-start date (includes past years). */
+export function programStartSemesters(): Semester[] {
+  return SEMS.filter(
+    (semester) => semester.year >= SEM_FIRST_YEAR && semester.year <= SEM_LAST_YEAR,
+  )
 }
 
 /** Best guess at the upcoming semester for default selection. */
@@ -59,8 +71,8 @@ export function planningSemesters(): Semester[] {
   const startIdx = anchorIdx >= 0 ? Math.max(0, anchorIdx - 1) : 0
   return SEMS.filter(
     (semester) =>
-      semester.year >= 2022 &&
-      semester.year <= 2031 &&
+      semester.year >= SEM_FIRST_YEAR &&
+      semester.year <= SEM_LAST_YEAR &&
       semIdx(semester.code) >= startIdx,
   )
 }
@@ -70,8 +82,8 @@ export function graduationSemesters(planFromCode: string): Semester[] {
   if (fromIdx < 0) return planningSemesters()
   return SEMS.filter(
     (semester) =>
-      semester.year >= 2022 &&
-      semester.year <= 2031 &&
+      semester.year >= SEM_FIRST_YEAR &&
+      semester.year <= SEM_LAST_YEAR &&
       semIdx(semester.code) >= fromIdx,
   )
 }
