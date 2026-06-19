@@ -185,6 +185,44 @@ export default function Planner() {
   const elTotal = takenElCount + elPlannedCount
   const elOverSelecting = elStillNeeded > 0 && elPlannedCount > elStillNeeded
   const elExtraBeyondMin = elTotal > EL_MIN
+  const hasLegacyEconomics = takenSet.has('EN5940')
+  const hasLegacyAnalytics = takenSet.has('EN5930_legacy')
+
+  const reqForStep2 = useMemo(
+    () =>
+      REQ.filter((course) => {
+        if (hasLegacyEconomics && (course.id === 'EN5941' || course.id === 'EN5942')) {
+          return false
+        }
+        if (hasLegacyAnalytics && course.id === 'EN5930') return false
+        return true
+      }),
+    [REQ, hasLegacyEconomics, hasLegacyAnalytics],
+  )
+
+  function toggleTaken(id: string, checked: boolean) {
+    setState((prev) => {
+      let taken = checked
+        ? [...prev.taken, id]
+        : prev.taken.filter((item) => item !== id)
+
+      if (checked && id === 'EN5940') {
+        taken = taken.filter((item) => item !== 'EN5941' && item !== 'EN5942')
+      }
+      if (checked && id === 'EN5930_legacy') {
+        taken = taken.filter((item) => item !== 'EN5930')
+      }
+      if ((checked && id === 'EN5941') || (checked && id === 'EN5942')) {
+        taken = taken.filter((item) => item !== 'EN5940')
+      }
+      if (checked && id === 'EN5930') {
+        taken = taken.filter((item) => item !== 'EN5930_legacy')
+      }
+
+      return { ...prev, taken, planLayout: null }
+    })
+  }
+
   const hasRes2 = takenSet.has(RES2.id)
   const hasPDs = hasWorkshopsDone(takenSet)
 
@@ -653,21 +691,26 @@ export default function Planner() {
 
             <div className="card">
               <div className="sec-label">Required Core Courses</div>
+              {hasLegacyEconomics && (
+                <div className="done-banner" style={{ marginBottom: 14 }}>
+                  ✓ <strong>ENMGT 5940</strong> (previous curriculum) satisfies{' '}
+                  <strong>ENMGT 5941 + ENMGT 5942</strong> — they won&apos;t be scheduled.
+                </div>
+              )}
+              {hasLegacyAnalytics && (
+                <div className="done-banner" style={{ marginBottom: 14 }}>
+                  ✓ <strong>ENMGT 5930</strong> (4 cr, previous curriculum) satisfies the
+                  current Data Analytics requirement.
+                </div>
+              )}
               <CourseList
-                courses={REQ}
+                courses={reqForStep2}
                 inputType="checkbox"
                 name="taken-req"
                 selected={takenSet}
                 expanded={expanded}
                 onExpand={toggleExpanded}
-                onToggle={(id, checked) =>
-                  setState((prev) => ({
-                    ...prev,
-                    taken: checked
-                      ? [...prev.taken, id]
-                      : prev.taken.filter((item) => item !== id),
-                  }))
-                }
+                onToggle={toggleTaken}
               />
             </div>
 
@@ -683,14 +726,7 @@ export default function Planner() {
                 selected={takenSet}
                 expanded={expanded}
                 onExpand={toggleExpanded}
-                onToggle={(id, checked) =>
-                  setState((prev) => ({
-                    ...prev,
-                    taken: checked
-                      ? [...prev.taken, id]
-                      : prev.taken.filter((item) => item !== id),
-                  }))
-                }
+                onToggle={toggleTaken}
               />
             </div>
 
@@ -745,9 +781,9 @@ export default function Planner() {
               <div className="info-row" style={{ marginBottom: 12 }}>
                 <span className="info-icon">🕐</span>
                 <span>
-                  If you started under an older proposal, mark courses here.
-                  Includes removed classes (e.g. ENMGT 5940) and previous credit
-                  amounts (e.g. Data Analytics was 4 cr).
+                  <strong>Took ENMGT 5940?</strong> Check it here — you do{' '}
+                  <strong>not</strong> need ENMGT 5941 or 5942. Same for old 4-cr
+                  Data Analytics vs. the current 3-cr version.
                 </span>
               </div>
               <CourseList
@@ -757,14 +793,7 @@ export default function Planner() {
                 selected={takenSet}
                 expanded={expanded}
                 onExpand={toggleExpanded}
-                onToggle={(id, checked) =>
-                  setState((prev) => ({
-                    ...prev,
-                    taken: checked
-                      ? [...prev.taken, id]
-                      : prev.taken.filter((item) => item !== id),
-                  }))
-                }
+                onToggle={toggleTaken}
               />
             </div>
 

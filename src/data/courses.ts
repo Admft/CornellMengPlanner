@@ -389,11 +389,21 @@ export function seasonKey(season: Season): 'fall' | 'spring' | 'summer' {
   return 'summer'
 }
 
+/** EN5940 (old 4-cr) or both EN5941+EN5942 satisfy the economics requirement. */
+export function economicsRequirementMet(taken: Set<string>): boolean {
+  return taken.has('EN5940') || (taken.has('EN5941') && taken.has('EN5942'))
+}
+
+/** Legacy 4-cr Data Analytics counts as EN5930. */
+export function analyticsRequirementMet(taken: Set<string>): boolean {
+  return taken.has('EN5930') || taken.has('EN5930_legacy')
+}
+
 /** Legacy EN5940 satisfies both economics requirements; legacy EN5930 counts as EN5930. */
 export function isCourseCompleted(id: string, taken: Set<string>): boolean {
   if (taken.has(id)) return true
   if (id === 'EN5930' && taken.has('EN5930_legacy')) return true
-  if ((id === 'EN5941' || id === 'EN5942') && taken.has('EN5940')) return true
+  if ((id === 'EN5941' || id === 'EN5942') && economicsRequirementMet(taken)) return true
   return false
 }
 

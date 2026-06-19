@@ -26,7 +26,7 @@ export const LEGACY_COURSES: Course[] = [
     cat: 'req',
     pri: 1,
     desc: 'Microeconomic principles, financial analysis, capital budgeting, valuation methods, and investment decision-making for engineering leaders.',
-    notes: 'Previous curriculum (Spring only). Replaced by ENMGT 5941 + ENMGT 5942.',
+    notes: 'Previous curriculum (Spring only). Checking this waives ENMGT 5941 + ENMGT 5942.',
     legacy: true,
     excelRow: 17,
   },
