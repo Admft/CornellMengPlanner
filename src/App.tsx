@@ -58,6 +58,7 @@ interface AppState {
 }
 
 const STEPS = ['Timeline', 'Courses Taken', 'Your Choices', 'Your Plan']
+const EL_MIN = 2
 
 function CourseList({
   courses,
@@ -149,6 +150,11 @@ export default function App() {
 
   const takenOB = OB.filter((course) => takenSet.has(course.id))
   const takenElCount = EL.filter((course) => takenSet.has(course.id)).length
+  const elPlannedCount = state.elChoices.length
+  const elStillNeeded = Math.max(0, EL_MIN - takenElCount)
+  const elTotal = takenElCount + elPlannedCount
+  const elOverSelecting = elStillNeeded > 0 && elPlannedCount > elStillNeeded
+  const elExtraBeyondMin = elTotal > EL_MIN
   const hasRes2 = takenSet.has(RES2.id)
   const hasPDs = hasWorkshopsDone(takenSet)
 
@@ -237,7 +243,7 @@ export default function App() {
     }
     if (step === 3) {
       const obOk = takenOB.length > 0 || !!state.obChoice
-      const elOk = takenElCount + state.elChoices.length >= 2
+      const elOk = takenElCount + state.elChoices.length >= EL_MIN
       setErrors((prev) => ({ ...prev, ob: !obOk, el: !elOk }))
       return obOk && elOk
     }
@@ -757,18 +763,105 @@ export default function App() {
 
             <div className="card">
               <div className="sec-label">
-                Specialization Electives — select at least 2 total
+                Specialization Electives — select at least {EL_MIN} total
               </div>
-              <div className="info-row" style={{ marginBottom: 12 }}>
-                <span className="info-icon">📚</span>
-                <span>
-                  {takenElCount >= 2
-                    ? `You've already completed ${takenElCount} elective(s) — you're at the minimum. Feel free to add more below.`
-                    : takenElCount > 0
-                      ? `You've completed ${takenElCount} elective(s). Select at least ${2 - takenElCount} more below.`
-                      : 'Select at least 2 electives to include in your degree plan.'}
-                </span>
+
+              <div className="el-tracker">
+                <div className="el-tracker-top">
+                  <span className="el-tracker-title">Elective count</span>
+                  <span
+                    className={`el-tracker-badge ${elTotal >= EL_MIN ? 'met' : 'need'}`}
+                  >
+                    {elTotal >= EL_MIN
+                      ? `${elTotal} total — requirement met`
+                      : `${elTotal} of ${EL_MIN} required`}
+                  </span>
+                </div>
+                <div className="el-tracker-bar">
+                  <div
+                    className="el-tracker-fill"
+                    style={{ width: `${Math.min(100, (elTotal / EL_MIN) * 100)}%` }}
+                  />
+                  <div className="el-tracker-mark" style={{ left: '100%' }} />
+                </div>
+                <div className="el-tracker-stats">
+                  <span>
+                    <strong>{takenElCount}</strong> completed
+                  </span>
+                  <span>
+                    <strong>{elPlannedCount}</strong> selected below
+                  </span>
+                  <span>
+                    <strong>{EL_MIN}</strong> minimum
+                  </span>
+                </div>
               </div>
+
+              {takenElCount >= EL_MIN ? (
+                <div className="alert alert-ok el-alert">
+                  <span className="alert-icon">✓</span>
+                  <div>
+                    You&apos;ve already completed the {EL_MIN}-elective minimum. Anything
+                    you select below is optional — add only if you want extra electives
+                    in your plan.
+                  </div>
+                </div>
+              ) : takenElCount > 0 ? (
+                <div className="info-row el-hint">
+                  <span className="info-icon">📚</span>
+                  <span>
+                    You&apos;ve completed <strong>{takenElCount}</strong> elective
+                    {takenElCount !== 1 ? 's' : ''}. Select{' '}
+                    <strong>{elStillNeeded}</strong> more below to reach the minimum.
+                  </span>
+                </div>
+              ) : (
+                <div className="info-row el-hint">
+                  <span className="info-icon">📚</span>
+                  <span>Select at least {EL_MIN} electives to include in your degree plan.</span>
+                </div>
+              )}
+
+              {elOverSelecting && (
+                <div className="alert alert-warn el-alert">
+                  <span className="alert-icon">⚠</span>
+                  <div>
+                    <strong>You&apos;re selecting more than you need.</strong>{' '}
+                    {takenElCount > 0 ? (
+                      <>
+                        You already completed {takenElCount} elective
+                        {takenElCount !== 1 ? 's' : ''}, so you only need{' '}
+                        <strong>{elStillNeeded} more</strong> — but you&apos;ve selected{' '}
+                        <strong>{elPlannedCount}</strong> below. That&apos;s{' '}
+                        <strong>{elTotal} total</strong> ({elTotal - EL_MIN} beyond the
+                        minimum). Extra electives are fine if you want them, but you can
+                        deselect {elPlannedCount - elStillNeeded} to stay at exactly{' '}
+                        {EL_MIN}.
+                      </>
+                    ) : (
+                      <>
+                        The degree requires <strong>{EL_MIN} electives</strong>, but
+                        you&apos;ve selected <strong>{elPlannedCount}</strong>. Deselect{' '}
+                        {elPlannedCount - EL_MIN} unless you intentionally want extra
+                        electives in your plan.
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!elOverSelecting && elExtraBeyondMin && takenElCount >= EL_MIN && (
+                <div className="alert alert-warn el-alert">
+                  <span className="alert-icon">ℹ</span>
+                  <div>
+                    You&apos;re adding <strong>{elPlannedCount}</strong> optional elective
+                    {elPlannedCount !== 1 ? 's' : ''} on top of the {EL_MIN} you already
+                    completed ({elTotal} total). That&apos;s allowed — just be aware they
+                    aren&apos;t required for the degree.
+                  </div>
+                </div>
+              )}
+
               <CourseList
                 courses={filteredElectives}
                 inputType="checkbox"
@@ -867,6 +960,18 @@ export default function App() {
               <div className="alert alert-err">
                 <span className="alert-icon">⚠</span>
                 <div>{exportError}</div>
+              </div>
+            )}
+
+            {elExtraBeyondMin && (
+              <div className="alert alert-warn">
+                <span className="alert-icon">📚</span>
+                <div>
+                  Your plan includes <strong>{elTotal} specialization electives</strong>{' '}
+                  ({takenElCount} completed + {elPlannedCount} planned). The degree only
+                  requires {EL_MIN}. Extra electives add credits and workload — confirm
+                  that&apos;s intentional.
+                </div>
               </div>
             )}
 

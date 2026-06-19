@@ -24,6 +24,14 @@ Set these in `.env`:
 
 Production: run `npm run build && npm start` to serve the app and API together on one port.
 
+### Deploy to Vercel
+
+1. Push the repo and import the project in Vercel (framework preset: **Vite**).
+2. Add the same env vars from `.env` in **Project → Settings → Environment Variables**.
+3. The request form uses the serverless function at `api/feature-request.js` — no extra config needed.
+
+Note: Vercel limits upload size to ~4.5 MB per request, so attachments are capped at 4 MB total.
+
 ## Features
 
 - 4-step wizard: timeline, courses taken, remaining choices, personalized plan

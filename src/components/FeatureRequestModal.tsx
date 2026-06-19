@@ -168,7 +168,7 @@ export function FeatureRequestModal({ open, onClose }: FeatureRequestModalProps)
                 onChange={handleFileChange}
               />
               <span className="hint">
-                Up to 5 files, 10 MB each (.xlsx, .pdf, images, etc.)
+                Up to 5 files, 4 MB total (.xlsx, .pdf, images, etc.)
               </span>
               {files.length > 0 && (
                 <ul className="req-file-list">
