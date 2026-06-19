@@ -7,6 +7,7 @@ import {
   type DeviceType,
   type SiteStats,
 } from '../lib/analytics'
+import SiteFooter from '../components/SiteFooter'
 import '../App.css'
 
 const DEVICE_LABELS: Record<DeviceType, string> = {
@@ -191,6 +192,8 @@ export default function StatsPage() {
           </p>
         )}
       </main>
+
+      <SiteFooter />
     </>
   )
 }

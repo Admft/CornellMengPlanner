@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CourseListItem, PlanCard } from './components/CourseItems'
 import { FeatureRequestModal } from './components/FeatureRequestModal'
+import SiteFooter from './components/SiteFooter'
 import {
   DEFAULT_CURRICULUM,
   analyticsRequirementMet,
@@ -1520,6 +1521,8 @@ export default function Planner() {
           )}
         </div>
       </div>
+
+      <SiteFooter />
     </>
   )
 }
