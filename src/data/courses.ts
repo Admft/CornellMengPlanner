@@ -103,7 +103,7 @@ export const DEFAULT_CURRICULUM: CurriculumCatalog = {
       cat: 'req',
       pri: 1,
       desc: 'Practical AI tools and workflows for technical teams, including implementation strategies and managing AI-driven projects.',
-      notes: 'Offered Fall only.',
+      notes: 'Offered Fall only. Required for incoming students (Summer 2026+). Returning students are waived.',
       excelRow: 20,
     },
     {
@@ -389,6 +389,10 @@ export function seasonKey(season: Season): 'fall' | 'spring' | 'summer' {
   return 'summer'
 }
 
+export interface CompletionContext {
+  returningStudent?: boolean
+}
+
 /** EN5940 (old 4-cr) or both EN5941+EN5942 satisfy the economics requirement. */
 export function economicsRequirementMet(taken: Set<string>): boolean {
   return taken.has('EN5940') || (taken.has('EN5941') && taken.has('EN5942'))
@@ -399,16 +403,37 @@ export function analyticsRequirementMet(taken: Set<string>): boolean {
   return taken.has('EN5930') || taken.has('EN5930_legacy')
 }
 
+/**
+ * Credits "lost" vs the old 4-cr Analytics + 4-cr Economics path when taking new requirements.
+ * Cornell advises making these up with 1-cr / 1.5-cr electives.
+ */
+export function curriculumCreditShortfall(taken: Set<string>): number {
+  let shortfall = 0
+  if (!analyticsRequirementMet(taken)) shortfall += 1
+  if (!economicsRequirementMet(taken)) shortfall += 1
+  return shortfall
+}
+
 /** Legacy EN5940 satisfies both economics requirements; legacy EN5930 counts as EN5930. */
-export function isCourseCompleted(id: string, taken: Set<string>): boolean {
+export function isCourseCompleted(
+  id: string,
+  taken: Set<string>,
+  ctx?: CompletionContext,
+): boolean {
   if (taken.has(id)) return true
   if (id === 'EN5930' && taken.has('EN5930_legacy')) return true
   if ((id === 'EN5941' || id === 'EN5942') && economicsRequirementMet(taken)) return true
+  // ENMGT 5405 (email: 5404) — incoming-only requirement; returning students waived
+  if (id === 'EN5405' && ctx?.returningStudent) return true
   return false
 }
 
-export function prereqsSatisfied(prereqs: string[], done: Set<string>): boolean {
-  return prereqs.every((prereq) => isCourseCompleted(prereq, done))
+export function prereqsSatisfied(
+  prereqs: string[],
+  done: Set<string>,
+  ctx?: CompletionContext,
+): boolean {
+  return prereqs.every((prereq) => isCourseCompleted(prereq, done, ctx))
 }
 
 export function hasWorkshopsDone(taken: Set<string>): boolean {

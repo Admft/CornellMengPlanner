@@ -55,6 +55,8 @@ export interface PlannerState {
   resChoice: 'session2' | 'workshops'
   customTaken: CustomTakenCourse[]
   curriculum: CurriculumCatalog
+  /** Matriculated before Summer 2026 — waives ENMGT 5405 AI requirement per Cornell. */
+  returningStudent: boolean
 }
 
 export interface SemesterPlan {
@@ -107,4 +109,5 @@ export const DEFAULT_STATE: Omit<PlannerState, 'curriculum' | 'planFromSem'> & {
   elChoices: new Set(),
   resChoice: 'session2',
   customTaken: [],
+  returningStudent: true,
 }

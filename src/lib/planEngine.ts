@@ -39,23 +39,28 @@ function takenElectiveCount(state: PlannerState): number {
   return state.curriculum.el.filter((c) => state.taken.has(c.id)).length
 }
 
+function completionCtx(state: PlannerState) {
+  return { returningStudent: state.returningStudent }
+}
+
 function nonElectiveQueue(state: PlannerState): Course[] {
   const { curriculum } = state
   const done = new Set(state.taken)
+  const ctx = completionCtx(state)
   const queue: Course[] = []
 
   curriculum.req.forEach((course) => {
-    if (!isCourseCompleted(course.id, done)) queue.push({ ...course })
+    if (!isCourseCompleted(course.id, done, ctx)) queue.push({ ...course })
   })
 
   if (state.resChoice === 'session2') {
-    if (!isCourseCompleted(curriculum.res2.id, done)) queue.push({ ...curriculum.res2 })
+    if (!isCourseCompleted(curriculum.res2.id, done, ctx)) queue.push({ ...curriculum.res2 })
   } else {
-    if (!isCourseCompleted(curriculum.pd1.id, done)) queue.push({ ...curriculum.pd1 })
-    if (!isCourseCompleted(curriculum.pd2.id, done)) queue.push({ ...curriculum.pd2 })
+    if (!isCourseCompleted(curriculum.pd1.id, done, ctx)) queue.push({ ...curriculum.pd1 })
+    if (!isCourseCompleted(curriculum.pd2.id, done, ctx)) queue.push({ ...curriculum.pd2 })
   }
 
-  if (state.obChoice && !isCourseCompleted(state.obChoice, done)) {
+  if (state.obChoice && !isCourseCompleted(state.obChoice, done, ctx)) {
     const ob = curriculum.ob.find((course) => course.id === state.obChoice)
     if (ob) queue.push({ ...ob })
   }
@@ -99,18 +104,26 @@ function optimizeElectives(state: PlannerState, candidates: Course[]): Course[] 
 
   if (best) return best
 
-  // Can't reach 30 — use minimum count, prefer lower-credit electives
+  // Can't reach 30 with minimum electives — add more (prefer smaller-credit makeup courses)
   const sorted = [...candidates].sort((a, b) => a.credits - b.credits || a.pri - b.pri)
-  return sorted.slice(0, minCount)
+  const picked = sorted.slice(0, minCount)
+  let total =
+    already + fixedCredits + picked.reduce((sum, course) => sum + course.credits, 0)
+  for (let i = minCount; i < sorted.length && total < MIN_DEGREE_CREDITS; i++) {
+    picked.push(sorted[i])
+    total += sorted[i].credits
+  }
+  return picked
 }
 
 function buildQueue(state: PlannerState): Course[] {
   const done = new Set(state.taken)
+  const ctx = completionCtx(state)
   const queue = nonElectiveQueue(state)
 
   const electiveCandidates: Course[] = []
   state.elChoices.forEach((courseId) => {
-    if (!isCourseCompleted(courseId, done)) {
+    if (!isCourseCompleted(courseId, done, ctx)) {
       const elective = state.curriculum.el.find((course) => course.id === courseId)
       if (elective) electiveCandidates.push({ ...elective })
     }
@@ -124,9 +137,10 @@ function buildQueue(state: PlannerState): Course[] {
 
 export function getSkippedElectives(state: PlannerState): Course[] {
   const done = new Set(state.taken)
+  const ctx = completionCtx(state)
   const chosen: Course[] = []
   state.elChoices.forEach((courseId) => {
-    if (!isCourseCompleted(courseId, done)) {
+    if (!isCourseCompleted(courseId, done, ctx)) {
       const elective = state.curriculum.el.find((course) => course.id === courseId)
       if (elective) chosen.push(elective)
     }
@@ -139,6 +153,7 @@ export function getSkippedElectives(state: PlannerState): Course[] {
 export function generatePlan(state: PlannerState): GeneratedPlan {
   const sems = semRange(state.planFromSem, state.gradSem)
   const done = new Set(state.taken)
+  const ctx = completionCtx(state)
   let queue = buildQueue(state)
 
   const limits = {
@@ -156,7 +171,7 @@ export function generatePlan(state: PlannerState): GeneratedPlan {
     const available = queue.filter(
       (course) =>
         course.seasons.includes(sem.season) &&
-        prereqsSatisfied(course.prereqs ?? [], done),
+        prereqsSatisfied(course.prereqs ?? [], done, ctx),
     )
 
     let used = 0
@@ -201,7 +216,7 @@ export function getAllPlacements(
   for (const course of takenCourses) {
     const semIndex = sems.findIndex((sem) => {
       if (!course.seasons.includes(sem.season)) return false
-      if (!prereqsSatisfied(course.prereqs ?? [], done)) return false
+      if (!prereqsSatisfied(course.prereqs ?? [], done, completionCtx(state))) return false
       const load = semLoads.get(sem.code) ?? 0
       const limit = limits[sem.season] ?? 12
       return load + course.credits <= limit

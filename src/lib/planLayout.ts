@@ -1,6 +1,7 @@
 import {
   getCourseById,
   prereqsSatisfied,
+  type CompletionContext,
 } from '../data/courses'
 import { LEGACY_COURSES } from '../data/legacyCourses'
 import type { Course, GeneratedPlan, PlannerState, Semester, SemesterPlan } from '../types'
@@ -91,7 +92,8 @@ export function canPlaceCourse(
 
   const before = coursesBefore(sems, plan, targetIdx)
   const done = new Set([...state.taken, ...before])
-  if (!prereqsSatisfied(course.prereqs ?? [], done)) {
+  const ctx: CompletionContext = { returningStudent: state.returningStudent }
+  if (!prereqsSatisfied(course.prereqs ?? [], done, ctx)) {
     return { ok: false, reason: `Prerequisites for ${course.code} must be completed first.` }
   }
 

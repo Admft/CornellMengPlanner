@@ -4,7 +4,10 @@ import { CourseListItem, PlanCard } from './components/CourseItems'
 import { FeatureRequestModal } from './components/FeatureRequestModal'
 import {
   DEFAULT_CURRICULUM,
+  analyticsRequirementMet,
   catalogToList,
+  curriculumCreditShortfall,
+  economicsRequirementMet,
   seasonKey,
 } from './data/courses'
 import { LEGACY_COURSES } from './data/legacyCourses'
@@ -68,6 +71,7 @@ interface AppState {
   curriculum: CurriculumCatalog
   curriculumImported: boolean
   planLayout: Record<string, string[]> | null
+  returningStudent: boolean
 }
 
 const STEPS = ['Timeline', 'Courses Taken', 'Your Choices', 'Your Plan']
@@ -133,6 +137,7 @@ export default function Planner() {
     curriculum: DEFAULT_CURRICULUM,
     curriculumImported: false,
     planLayout: null,
+    returningStudent: DEFAULT_STATE.returningStudent,
   })
   const proposalTemplateRef = useRef<ArrayBuffer | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -191,14 +196,17 @@ export default function Planner() {
   const reqForStep2 = useMemo(
     () =>
       REQ.filter((course) => {
+        if (state.returningStudent && course.id === 'EN5405') return false
         if (hasLegacyEconomics && (course.id === 'EN5941' || course.id === 'EN5942')) {
           return false
         }
         if (hasLegacyAnalytics && course.id === 'EN5930') return false
         return true
       }),
-    [REQ, hasLegacyEconomics, hasLegacyAnalytics],
+    [REQ, hasLegacyEconomics, hasLegacyAnalytics, state.returningStudent],
   )
+
+  const creditShortfall = curriculumCreditShortfall(takenSet)
 
   function toggleTaken(id: string, checked: boolean) {
     setState((prev) => {
@@ -222,6 +230,10 @@ export default function Planner() {
       return { ...prev, taken, planLayout: null }
     })
   }
+
+  const waivedAI = state.returningStudent
+  const metLegacyPair =
+    analyticsRequirementMet(takenSet) && economicsRequirementMet(takenSet)
 
   const hasRes2 = takenSet.has(RES2.id)
   const hasPDs = hasWorkshopsDone(takenSet)
@@ -596,6 +608,33 @@ export default function Planner() {
             </div>
 
             <div className="card">
+              <div className="sec-label">Student status</div>
+              <label className="returning-check">
+                <input
+                  type="checkbox"
+                  checked={state.returningStudent}
+                  onChange={(e) =>
+                    setState((prev) => ({
+                      ...prev,
+                      returningStudent: e.target.checked,
+                      planLayout: null,
+                    }))
+                  }
+                />
+                <span>
+                  <strong>Returning student</strong> (matriculated before Summer 2026)
+                </span>
+              </label>
+              <p className="returning-note">
+                Per Cornell&apos;s Fall 2026 curriculum update: returning students are{' '}
+                <strong>not required</strong> to take ENMGT 5405 Applied AI (the email
+                lists 5404 — same new AI requirement). Incoming students must take it.
+                If you already completed ENMGT 5930 and ENMGT 5940, mark those in Step 2
+                and the split/credit changes don&apos;t apply to you.
+              </p>
+            </div>
+
+            <div className="card">
               <div className="sec-label">Curriculum version</div>
               <div className="info-row" style={{ marginBottom: 14 }}>
                 <span className="info-icon">📄</span>
@@ -691,6 +730,12 @@ export default function Planner() {
 
             <div className="card">
               <div className="sec-label">Required Core Courses</div>
+              {waivedAI && (
+                <div className="done-banner" style={{ marginBottom: 14 }}>
+                  ✓ <strong>ENMGT 5405</strong> waived — returning students don&apos;t need
+                  the new AI requirement (optional elective only).
+                </div>
+              )}
               {hasLegacyEconomics && (
                 <div className="done-banner" style={{ marginBottom: 14 }}>
                   ✓ <strong>ENMGT 5940</strong> (previous curriculum) satisfies{' '}
@@ -911,6 +956,18 @@ export default function Planner() {
               )}
             </div>
 
+            {creditShortfall > 0 && state.step >= 3 && (
+              <div className="info-row" style={{ marginBottom: 12 }}>
+                <span className="info-icon">ℹ</span>
+                <span>
+                  You haven&apos;t taken the old 4-cr ENMGT 5930 / ENMGT 5940 yet. The
+                  new requirements are <strong>{creditShortfall} credit(s) shorter</strong>{' '}
+                  — add 1-cr or 1.5-cr electives in Step 3 (e.g. ENMGT 6092, ENMGT 6095)
+                  to reach 30.
+                </span>
+              </div>
+            )}
+
             <div className="card">
               <div className="sec-label">
                 Specialization Electives — select at least {EL_MIN} total
@@ -1106,6 +1163,16 @@ export default function Planner() {
               credit caps). Export downloads the official Cornell proposal form.
             </p>
 
+            {metLegacyPair && (
+              <div className="alert alert-ok">
+                <span className="alert-icon">✓</span>
+                <div>
+                  You&apos;ve already taken ENMGT 5930 and ENMGT 5940 (or their
+                  equivalents) — Cornell says you can disregard the split/credit changes.
+                </div>
+              </div>
+            )}
+
             {skippedElectives.length > 0 && (
               <div className="alert alert-ok">
                 <span className="alert-icon">✓</span>
@@ -1166,9 +1233,32 @@ export default function Planner() {
                 <span className="alert-icon">💰</span>
                 <div>
                   Your plan is <strong>{credits.total} credits</strong> —{' '}
-                  <strong>{creditOvershoot} above</strong> the 30-credit minimum. Some
-                  requirements can&apos;t go lower than this; deselect extra electives in
-                  Step 3 or drag courses to spread the load.
+                  <strong>{creditOvershoot} above</strong> the 30-credit minimum.
+                  {!state.returningStudent && (
+                    <>
+                      {' '}
+                      Incoming students must take ENMGT 5405 (+3 cr), so the core
+                      curriculum is often <strong>32+ credits</strong> before electives.
+                    </>
+                  )}
+                  {state.returningStudent && creditShortfall > 0 && (
+                    <>
+                      {' '}
+                      The 5930/5940 credit reductions mean you may need 1-cr or 1.5-cr
+                      makeup electives (e.g. ENMGT 6092, ENMGT 6095) — or pick a 3-cr +
+                      two 1.5-cr electives to land closer to 30.
+                    </>
+                  )}
+                  {state.returningStudent && creditShortfall === 0 && (
+                    <>
+                      {' '}
+                      With legacy 5930/5940 done, overshoot usually comes from
+                      3-credit-only electives — try 1.5-cr courses in Step 3 to get
+                      closer to 30.
+                    </>
+                  )}
+                  {' '}
+                  Deselect extra electives in Step 3 or drag courses to spread the load.
                 </div>
               </div>
             )}
