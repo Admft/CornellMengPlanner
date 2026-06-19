@@ -458,6 +458,7 @@ body {
 }
 
 input[type='text'],
+input[type='number'],
 select {
   width: 100%;
   padding: 9px 11px;
@@ -466,6 +467,18 @@ select {
   font-size: 13.5px;
   color: var(--text);
   background: #fff;
+  font-family: inherit;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 select {
@@ -478,6 +491,7 @@ select {
 }
 
 input[type='text']:focus,
+input[type='number']:focus,
 select:focus {
   outline: none;
   border-color: var(--red);
@@ -819,13 +833,36 @@ select:focus {
 
 .custom-add-row {
   display: grid;
-  grid-template-columns: 1fr 2fr 100px auto;
+  grid-template-columns: 1fr 2fr 88px auto;
   gap: 12px;
   align-items: end;
 }
 
+.custom-add-row input[type='text'],
+.custom-add-row input[type='number'],
+.custom-add-row .btn {
+  box-sizing: border-box;
+  height: 39px;
+}
+
+.custom-add-row input[type='text'],
+.custom-add-row input[type='number'] {
+  padding: 0 11px;
+  line-height: 37px;
+}
+
+.custom-add-row .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .fg-narrow input {
   width: 100%;
+  text-align: center;
 }
 
 @media (max-width: 720px) {
