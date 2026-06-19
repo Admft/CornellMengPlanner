@@ -54,12 +54,11 @@ Tracked automatically:
 
 | Metric | When it increments |
 |--------|-------------------|
-| Planner sessions | Once per browser session when someone opens the planner |
-| Device (mobile / tablet / desktop) | Same session, based on user agent |
-| Stats page views | Each visit to `/stats` |
+| Daily visitors | Once per browser per calendar day when someone opens the planner |
+| Device (mobile / tablet / desktop) | Same first visit that day, based on user agent |
 | Excel exports | Each successful proposal download |
 
-Counts are stored on CountAPI’s free public counters — no backend or env vars required.
+Counts use a free public counter API — no backend or env vars required. Refreshing the stats page does not inflate numbers.
 
 ## Export
 

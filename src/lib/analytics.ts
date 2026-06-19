@@ -1,16 +1,18 @@
 /**
  * Anonymous usage counters — no account or API key required.
  * countapi.xyz shut down; this uses the community replacement at countapi.mileshilliard.com
+ *
+ * Visitor counts are deduped client-side: one hit per browser per calendar day.
+ * Excel exports count every download.
  */
 
 const API_BASE = 'https://countapi.mileshilliard.com/api/v1'
 
 export const COUNTERS = {
-  visits: 'cornell-meng-planner-visits',
-  mobile: 'cornell-meng-planner-device-mobile',
-  tablet: 'cornell-meng-planner-device-tablet',
-  desktop: 'cornell-meng-planner-device-desktop',
-  statsViews: 'cornell-meng-planner-stats-page-views',
+  dailyVisitors: 'cornell-meng-planner-daily-visitors',
+  mobile: 'cornell-meng-planner-daily-mobile',
+  tablet: 'cornell-meng-planner-daily-tablet',
+  desktop: 'cornell-meng-planner-daily-desktop',
   excelExports: 'cornell-meng-planner-excel-exports',
 } as const
 
@@ -22,8 +24,27 @@ const DEVICE_COUNTER: Record<DeviceType, string> = {
   desktop: COUNTERS.desktop,
 }
 
-const SESSION_VISIT_KEY = 'mem-planner-visit-recorded'
+const DAILY_VISIT_PREFIX = 'mem-planner-counted'
 const API_TIMEOUT_MS = 8000
+
+function todayKey(): string {
+  const d = new Date()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${month}-${day}`
+}
+
+function dailyStorageKey(kind: string): string {
+  return `${DAILY_VISIT_PREFIX}:${kind}:${todayKey()}`
+}
+
+/** Synchronous guard — safe even when React StrictMode runs effects twice. */
+function markOnceToday(kind: string): boolean {
+  const key = dailyStorageKey(kind)
+  if (localStorage.getItem(key)) return false
+  localStorage.setItem(key, '1')
+  return true
+}
 
 function apiUrl(action: 'hit' | 'get', key: string) {
   return `${API_BASE}/${action}/${key}`
@@ -71,55 +92,51 @@ export function detectDevice(): DeviceType {
   return 'desktop'
 }
 
-/** Record one visit per browser session (survives refresh, not new tabs). */
+/**
+ * Record one daily visitor when someone opens the planner.
+ * Same browser only counts once per calendar day; resets at midnight local time.
+ */
 export async function recordPlannerVisit(): Promise<void> {
-  if (sessionStorage.getItem(SESSION_VISIT_KEY)) return
-  sessionStorage.setItem(SESSION_VISIT_KEY, '1')
+  if (!markOnceToday('visit')) return
 
   const device = detectDevice()
   await Promise.all([
-    fetchCount('hit', COUNTERS.visits),
+    fetchCount('hit', COUNTERS.dailyVisitors),
     fetchCount('hit', DEVICE_COUNTER[device]),
   ])
 }
 
-export async function recordStatsPageView(): Promise<number | null> {
-  return fetchCount('hit', COUNTERS.statsViews)
-}
-
+/** Every Excel export increments — intentional raw count. */
 export async function recordExcelExport(): Promise<void> {
   await fetchCount('hit', COUNTERS.excelExports)
 }
 
 export interface SiteStats {
-  visits: number | null
+  dailyVisitors: number | null
   mobile: number | null
   tablet: number | null
   desktop: number | null
-  statsViews: number | null
   excelExports: number | null
   deviceTotal: number
   lastFetched: Date
 }
 
 export async function fetchSiteStats(): Promise<SiteStats> {
-  const [visits, mobile, tablet, desktop, statsViews, excelExports] = await Promise.all([
-    fetchCount('get', COUNTERS.visits),
+  const [dailyVisitors, mobile, tablet, desktop, excelExports] = await Promise.all([
+    fetchCount('get', COUNTERS.dailyVisitors),
     fetchCount('get', COUNTERS.mobile),
     fetchCount('get', COUNTERS.tablet),
     fetchCount('get', COUNTERS.desktop),
-    fetchCount('get', COUNTERS.statsViews),
     fetchCount('get', COUNTERS.excelExports),
   ])
 
   const deviceTotal = (mobile ?? 0) + (tablet ?? 0) + (desktop ?? 0)
 
   return {
-    visits,
+    dailyVisitors,
     mobile,
     tablet,
     desktop,
-    statsViews,
     excelExports,
     deviceTotal,
     lastFetched: new Date(),

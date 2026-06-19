@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   devicePercent,
   detectDevice,
   fetchSiteStats,
-  recordStatsPageView,
   type DeviceType,
   type SiteStats,
 } from '../lib/analytics'
@@ -68,16 +67,16 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [thisDevice] = useState(() => detectDevice())
+  const loadedRef = useRef(false)
 
   async function loadStats() {
     setLoading(true)
     setError('')
     try {
-      await recordStatsPageView()
       const data = await fetchSiteStats()
       setStats(data)
       if (
-        data.visits == null &&
+        data.dailyVisitors == null &&
         data.mobile == null &&
         data.desktop == null
       ) {
@@ -93,6 +92,8 @@ export default function StatsPage() {
   }
 
   useEffect(() => {
+    if (loadedRef.current) return
+    loadedRef.current = true
     void loadStats()
   }, [])
 
@@ -116,8 +117,9 @@ export default function StatsPage() {
           <div>
             <h1 className="step-title">Planner usage</h1>
             <p className="step-sub">
-              Anonymous session counts via a public counter API (no signup required).
-              One visit per browser session; device type from your user agent.
+              Approximate unique reach — one count per browser per day (resets at
+              midnight). Excel exports count every download. No accounts or cookies
+              beyond local deduping.
             </p>
           </div>
           <button
@@ -139,19 +141,14 @@ export default function StatsPage() {
 
         <div className="stats-grid">
           <StatCard
-            label="Planner sessions"
-            value={stats?.visits ?? (loading ? '…' : '—')}
-            sub="Unique browser sessions"
-          />
-          <StatCard
-            label="Stats page views"
-            value={stats?.statsViews ?? (loading ? '…' : '—')}
-            sub="Including this page"
+            label="Daily visitors"
+            value={stats?.dailyVisitors ?? (loading ? '…' : '—')}
+            sub="One per browser per day"
           />
           <StatCard
             label="Excel exports"
             value={stats?.excelExports ?? (loading ? '…' : '—')}
-            sub="Proposal downloads"
+            sub="Every proposal download"
           />
           <StatCard
             label="Your device"
@@ -161,10 +158,11 @@ export default function StatsPage() {
         </div>
 
         <div className="card">
-          <div className="sec-label">Sessions by device</div>
+          <div className="sec-label">Visitors by device</div>
           <p className="stats-device-note">
-            Each planner session increments one device counter based on screen /
-            user-agent detection.
+            When someone opens the planner for the first time that day, one device
+            counter increments. Refreshing or revisiting the same day does not add
+            another count.
           </p>
 
           <DeviceBar
@@ -185,16 +183,6 @@ export default function StatsPage() {
             percent={devicePercent(stats?.tablet ?? null, deviceTotal)}
             color="#999"
           />
-
-          {stats && deviceTotal > 0 && stats.visits != null && deviceTotal !== stats.visits && (
-            <div className="info-row" style={{ marginTop: 16 }}>
-              <span className="info-icon">ℹ</span>
-              <span>
-                Device totals may differ slightly from session count when stats
-                were collected before device tracking was added.
-              </span>
-            </div>
-          )}
         </div>
 
         {stats?.lastFetched && (
