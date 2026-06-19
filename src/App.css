@@ -73,6 +73,136 @@ body {
   background: rgba(255, 255, 255, 0.22);
 }
 
+.hdr-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.hdr-link {
+  color: #fff;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+
+.hdr-link:hover {
+  background: rgba(255, 255, 255, 0.14);
+  opacity: 1;
+}
+
+.stats-main {
+  max-width: 720px;
+}
+
+.stats-hdr-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 18px 16px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.stat-card-val {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--red);
+  line-height: 1.1;
+}
+
+.stat-card-lbl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 6px;
+}
+
+.stat-card-sub {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 4px;
+}
+
+.stats-device-note {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+
+.device-row {
+  margin-bottom: 14px;
+}
+
+.device-row:last-child {
+  margin-bottom: 0;
+}
+
+.device-row-hdr {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.device-row-lbl {
+  font-weight: 600;
+}
+
+.device-row-num {
+  color: var(--text2);
+}
+
+.device-row-pct {
+  color: var(--text3);
+  font-size: 12px;
+}
+
+.device-row-track {
+  height: 10px;
+  background: #ececea;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.device-row-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.stats-updated {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 20px;
+}
+
+.stats-main a {
+  color: var(--red);
+}
+
 .hdr-word {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 17px;
