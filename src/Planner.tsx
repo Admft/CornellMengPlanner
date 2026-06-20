@@ -39,6 +39,7 @@ import {
   type PlannerState,
 } from './types'
 import { recordExcelExport, recordPlannerVisit } from './lib/analytics'
+import { setDefaultPageMeta } from './lib/pageMeta'
 import './App.css'
 
 function toPlannerState(state: AppState): PlannerState {
@@ -192,6 +193,7 @@ export default function Planner() {
   const ALL_COURSES = useMemo(() => catalogToList(curriculum), [curriculum])
 
   useEffect(() => {
+    setDefaultPageMeta()
     void recordPlannerVisit()
   }, [])
 

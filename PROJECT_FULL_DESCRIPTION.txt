@@ -1,0 +1,878 @@
+================================================================================
+CORNELL MEM SCHEDULE PLANNER — COMPLETE PROJECT DESCRIPTION
+================================================================================
+
+Last updated: June 19, 2026
+Live site: https://www.cornellmemscheduleplanner.com
+GitHub: https://github.com/Admft/CornellMengPlanner.git
+Author: Adam Moffat (Cornell M.Eng. student)
+         https://www.linkedin.com/in/adamrmoffat/
+
+================================================================================
+1. WHAT THIS PROJECT IS
+================================================================================
+
+Cornell MEM Schedule Planner is a free, browser-based web application for Cornell
+University M.Eng. Management (MEM) distance-learning students. It helps students:
+
+  • Build a personalized semester-by-semester degree plan
+  • Track completed courses and remaining requirements
+  • Handle Fall 2026 curriculum changes (returning vs incoming students)
+  • Automatically schedule courses with prerequisite and credit-limit rules
+  • Drag-and-drop courses between semesters to customize the plan
+  • Export a filled-out copy of Cornell's official degree proposal Excel template
+
+The app is NOT affiliated with or endorsed by Cornell University. It is a student-
+built tool that mirrors Cornell's official proposal spreadsheet format.
+
+Program facts baked into the app:
+  • Minimum degree requirement: 30 credits
+  • Typical completion: 4–6 semesters (~2 years)
+  • Default credit load: 8 credits/semester (configurable 4–12)
+  • Summer semesters: always capped at 2 credits
+  • Minimum specialization electives: 2 courses total (completed + planned)
+
+
+================================================================================
+2. LIVE SITE — cornellmemscheduleplanner.com
+================================================================================
+
+Production URL: https://www.cornellmemscheduleplanner.com
+Canonical domain: www.cornellmemscheduleplanner.com (with www)
+
+Routes:
+  /         — Main 4-step course planner wizard
+  /stats    — Anonymous public usage statistics dashboard
+
+Header branding:
+  • Cornell University seal logo
+  • "Cornell Engineering | M.Eng. Management · Course Planner"
+  • Links: "Stats" and "Request a change" (feedback form)
+
+Footer:
+  "Built by Adam Moffat, a Cornell M.Eng. student" (links to LinkedIn)
+
+Theme color: Cornell red #b31b1b
+
+SEO / discoverability:
+  • index.html includes full meta tags (description, keywords, author, robots)
+  • Open Graph tags for social sharing (LinkedIn, iMessage, etc.)
+  • Twitter/X card metadata
+  • JSON-LD structured data (schema.org WebApplication)
+  • Canonical URL pointing to production domain
+  • public/robots.txt — allows all crawlers, references sitemap
+  • public/sitemap.xml — lists / and /stats
+  • src/lib/pageMeta.ts — updates title/description/canonical dynamically per route
+
+Search keywords targeted:
+  Cornell MEM, Cornell M.Eng, schedule planner, course planner, MEM distance
+  learning, ENMGT, degree plan, Cornell Engineering Management
+
+
+================================================================================
+3. LIVE USAGE STATS (as of June 19, 2026)
+================================================================================
+
+Stats are visible at https://www.cornellmemscheduleplanner.com/stats
+
+Current counter values (from countapi.mileshilliard.com):
+  Daily visitors:  25
+  Excel exports:    1
+  Mobile visitors: 11
+  Desktop visitors: 15
+  Tablet visitors:  0 (counter key not yet created — no tablet visits recorded)
+
+How stats work:
+  • Powered by free public counter API: https://countapi.mileshilliard.com/api/v1
+  • Replaces the defunct countapi.xyz service
+  • No backend, no API keys, no accounts required
+  • Implementation: src/lib/analytics.ts
+
+Counter keys (namespace: cornell-meng-planner-*):
+  cornell-meng-planner-daily-visitors   — one hit per browser per calendar day
+  cornell-meng-planner-daily-mobile     — device breakdown (mobile)
+  cornell-meng-planner-daily-tablet     — device breakdown (tablet)
+  cornell-meng-planner-daily-desktop    — device breakdown (desktop)
+  cornell-meng-planner-excel-exports    — every successful Excel download
+
+Deduplication:
+  • Visitor counts use localStorage key: mem-planner-counted:visit:YYYY-MM-DD
+  • Same browser only counts once per day (resets at local midnight)
+  • Refreshing /stats page does NOT inflate visitor numbers
+  • Excel exports are NOT deduped — every download increments
+
+Device detection (user agent parsing):
+  • Tablet: iPad, Tablet, PlayBook, Silk, Android without "Mobile"
+  • Mobile: iPhone, iPod, Android Mobile, webOS, BlackBerry, etc.
+  • Everything else: desktop
+
+recordPlannerVisit() fires once on Planner mount (useEffect in Planner.tsx).
+recordExcelExport() fires after successful exportProposalExcel() call.
+
+
+================================================================================
+4. TECH STACK
+================================================================================
+
+Frontend:
+  • React 19.1 + TypeScript 5.8
+  • Vite 6.3 (build tool + dev server)
+  • React Router DOM 7.18 (client-side routing: / and /stats)
+  • ExcelJS 4.4 (read/write .xlsx in browser — export + curriculum import)
+  • Plain CSS (src/App.css, src/index.css) — no UI framework
+
+Backend (feature request email only):
+  • Vercel serverless function: api/feature-request.js
+  • Express 5.1 (optional self-hosted production: server/index.js)
+  • Nodemailer 7.0 (Gmail SMTP) OR Resend 4.5 (Vercel-friendly email API)
+  • Formidable 3.5 (multipart form parsing for file attachments)
+
+Deployment:
+  • Vercel (framework preset: Vite)
+  • vercel.json SPA rewrite: all non-/api/* routes → /index.html
+
+No database. No user accounts. No server-side session storage. All planner state
+lives in React component state (lost on page refresh).
+
+
+================================================================================
+5. PROJECT FILE STRUCTURE
+================================================================================
+
+CornellProject/
+├── index.html                    — HTML shell, SEO meta, JSON-LD
+├── package.json                  — npm scripts and dependencies
+├── vercel.json                   — SPA routing for Vercel
+├── vite.config.ts                — Vite + React plugin + dev API middleware
+├── tsconfig.json
+├── .env.example                  — Email env var template (never commit .env)
+├── README.md                     — Quick start guide
+│
+├── api/
+│   └── feature-request.js        — Vercel serverless handler (POST only)
+│
+├── server/
+│   ├── index.js                  — Express production server (npm start)
+│   ├── featureRequestCore.js     — Shared email logic (SMTP + Resend)
+│   └── featureRequestHandler.js  — Express route + Vite dev plugin
+│
+├── scripts/
+│   └── setup-email.mjs           — Interactive .env email setup (npm run setup:email)
+│
+├── public/
+│   ├── Cornellproposal.xlsx      — Official Cornell MEM proposal template (~18 KB)
+│   ├── Cornell_University_seal.svg.png
+│   ├── robots.txt
+│   └── sitemap.xml
+│
+└── src/
+    ├── main.tsx                  — React entry point
+    ├── App.tsx                   — Router: / → Planner, /stats → StatsPage
+    ├── Planner.tsx               — Main 4-step wizard (~1690 lines)
+    ├── types.ts                  — TypeScript interfaces and constants
+    │
+    ├── pages/
+    │   └── StatsPage.tsx         — Usage stats dashboard
+    │
+    ├── components/
+    │   ├── CourseItems.tsx       — Course list items and plan cards
+    │   ├── FeatureRequestModal.tsx
+    │   └── SiteFooter.tsx
+    │
+    ├── data/
+    │   ├── courses.ts            — DEFAULT_CURRICULUM (all current courses)
+    │   ├── legacyCourses.ts      — Pre-2026 curriculum courses
+    │   └── semesters.ts          — Semester codes, ranges, Excel column logic
+    │
+    └── lib/
+        ├── analytics.ts          — Visitor/export counters
+        ├── curriculumImport.ts   — Parse proposal .xlsx → course catalog
+        ├── customExcel.ts        — Place custom/legacy courses on Excel rows
+        ├── excelExport.ts        — Fill template and trigger download
+        ├── pageMeta.ts           — Dynamic document title/meta tags
+        ├── planEngine.ts         — Auto-scheduling algorithm
+        ├── planLayout.ts         — Drag-and-drop layout + validation
+        └── submitFeatureRequest.ts
+
+
+================================================================================
+6. NPM SCRIPTS
+================================================================================
+
+npm run dev          — Start Vite dev server (default http://localhost:5173)
+                       Feature request API is embedded via Vite plugin — no
+                       second process needed during development.
+
+npm run dev:api      — Run Express API server alone on PORT (default 3001)
+
+npm run build        — TypeScript compile + Vite production build → dist/
+
+npm run preview      — Preview production build locally
+
+npm start            — NODE_ENV=production node server/index.js
+                       Serves dist/ static files + /api/feature-request
+                       (for self-hosted deployment, not Vercel)
+
+npm run setup:email  — Interactive wizard to write SMTP/Resend creds to .env
+
+
+================================================================================
+7. DEPLOYMENT TO VERCEL — STEP BY STEP
+================================================================================
+
+How the live site at cornellmemscheduleplanner.com is deployed:
+
+1. SOURCE CONTROL
+   Repository: https://github.com/Admft/CornellMengPlanner.git
+   Push commits to GitHub; Vercel watches the repo for changes.
+
+2. VERCEL PROJECT SETUP
+   • Import project in Vercel dashboard
+   • Framework preset: Vite (auto-detected)
+   • Build command: npm run build  (runs tsc -b && vite build)
+   • Output directory: dist
+   • Install command: npm install
+
+3. VERCEL.JSON ROUTING
+   {
+     "rewrites": [
+       { "source": "/((?!api/).*)", "destination": "/index.html" }
+     ]
+   }
+   This makes React Router work: all paths except /api/* serve index.html.
+   The /api/feature-request.js file is auto-deployed as a serverless function.
+
+4. ENVIRONMENT VARIABLES (Vercel Project → Settings → Environment Variables)
+   Required for the feedback form to work:
+     FEATURE_REQUEST_RECIPIENTS  — comma-separated email addresses
+     Either:
+       SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM
+     Or:
+       RESEND_API_KEY, RESEND_FROM
+
+   Recipients are server-only — never bundled into the frontend JavaScript.
+
+5. DOMAIN
+   Custom domain cornellmemscheduleplanner.com configured in Vercel DNS settings.
+   Canonical URLs in index.html and pageMeta.ts use www.cornellmemscheduleplanner.com.
+
+6. WHAT VERCEL HOSTS
+   • Static frontend from dist/ (HTML, JS, CSS, public assets)
+   • public/Cornellproposal.xlsx served at /Cornellproposal.xlsx
+   • Serverless function at /api/feature-request (POST, multipart form)
+
+7. VERCEL LIMITATIONS
+   • Request body limit ~4.5 MB — attachments capped at 4 MB total
+   • Serverless function cold starts possible on first feedback submission
+   • No persistent server — stats counters use external countapi service
+
+8. DEPLOY TRIGGER
+   Every push to the connected branch triggers automatic rebuild and deploy.
+   No manual deploy steps beyond git push (assuming Vercel integration is active).
+
+
+================================================================================
+8. LOCAL DEVELOPMENT WORKFLOW
+================================================================================
+
+Setup:
+  1. git clone https://github.com/Admft/CornellMengPlanner.git
+  2. cd CornellProject
+  3. npm install
+  4. cp .env.example .env
+  5. npm run setup:email   (or manually fill .env)
+  6. npm run dev
+  7. Open http://localhost:5173
+
+During dev:
+  • Vite hot-reloads React components
+  • /api/feature-request is handled by featureRequestDevPlugin() in vite.config.ts
+    — middleware intercepts POST /api/feature-request without running Express
+  • Excel template fetched from /Cornellproposal.xlsx (Vite serves public/)
+  • Stats counters hit the real countapi.mileshilliard.com (same as production)
+
+Self-hosted production (alternative to Vercel):
+  npm run build && npm start
+  Serves everything on PORT (default 3001) via Express.
+
+
+================================================================================
+9. USER WORKFLOW — THE 4-STEP WIZARD
+================================================================================
+
+The main UI is Planner.tsx. A sticky header shows step progress:
+  Step 1: Timeline
+  Step 2: Courses Taken
+  Step 3: Your Choices
+  Step 4: Your Plan
+
+Bottom action bar: "← Back" and "Continue →" (Step 4 shows "Recalculate →").
+
+
+--- STEP 1: TIMELINE ---
+
+Student information:
+  • Name (written to Excel C4)
+  • NetID (Excel C6)
+  • Student ID # (Excel C5)
+  • Advisor dropdown: Andrea Ippolito, Robert Newman, Dirk Swart (Excel G6)
+
+Timeline:
+  • Next semester (planFromSem) — first semester to include in the plan
+    Default: auto-detected upcoming term (e.g. SU26, FA26, SP27)
+  • Target graduation semester (gradSem) — default SP28
+    Must be same or later than next semester
+  • Program start semester (optional, for Excel export only)
+    Sets first Excel column (E) and where completed courses are placed
+    Options from Spring 2024 onward; blank = same as next semester
+
+Student status:
+  • "Returning student" checkbox (matriculated before Summer 2026)
+    Waives ENMGT 5405 Applied AI requirement per Cornell Fall 2026 update
+    Default: checked (returningStudent: true)
+
+Curriculum version:
+  • "Import proposal .xlsx" — uploads Cornell's spreadsheet to replace built-in
+    course list with latest semester's courses
+  • Parsed by curriculumImport.ts; also caches file as Excel export template
+  • If not imported, uses DEFAULT_CURRICULUM from src/data/courses.ts
+
+Credits per semester:
+  • Slider: 4–12 credits (default 8)
+  • Summer always capped at 2 regardless of this setting
+
+
+--- STEP 2: COURSES TAKEN ---
+
+Check off every completed course. Expandable course cards show descriptions.
+
+Sections:
+  1. Required Core Courses (req + capstone)
+     — EN5405 hidden for returning students (waived)
+     — EN5941/5942 hidden if EN5940 (legacy) taken
+     — EN5930 hidden if EN5930_legacy (4-cr old version) taken
+
+  2. Organizational Behavior (pick 1 if already done)
+
+  3. Specialization Electives (check any completed)
+
+  4. Residential & Professional Development
+     — EN6001 (Residential Session I)
+     — EN6002 (Residential Session II) OR EN6010+EN6011 (PD Workshops)
+
+  5. Previous curriculum courses (legacy)
+     — EN5930_legacy (4 cr Data Analytics)
+     — EN5940 (4 cr Economics and Finance — waives 5941+5942)
+     — EN6012 (old PD Workshop II)
+
+  6. Custom completed courses
+     — For removed/unlisted courses from transcript
+     — Fields: code, name, credits, type (category), semester taken
+
+Excel semester picker (optional per course):
+  • Dropdown on each checked course: which semester it was taken
+  • Only affects Excel export column placement
+  • "Skip" = auto-place based on program start through next semester
+  • Options: 3 calendar years from program start semester
+
+
+--- STEP 3: YOUR CHOICES ---
+
+Plan remaining degree requirements:
+
+Organizational Behavior — select exactly 1 (radio buttons)
+  Skipped if already completed in Step 2.
+
+Specialization Electives — minimum 2 total (completed + selected)
+  Checkbox multi-select with live tracker showing count vs minimum.
+  Planner optimizes elective subset toward 30 credits (may skip extras).
+  Filtered list excludes OB courses already chosen as org behavior requirement.
+
+Residential / Professional Development:
+  If not already done, choose one:
+    • Residential Session II (EN6002, 1 cr, Summer) — default
+    • Two PD Workshops (EN6010 + EN6011, 0.5 cr each, Fall/Spring)
+
+Credit shortfall warning:
+  If student hasn't taken old 4-cr EN5930/EN5940, new requirements are shorter.
+  Suggests adding 1-cr or 1.5-cr electives (e.g. EN6092, EN6095) to reach 30.
+
+Validation before continuing:
+  • Must have OB choice (or already completed)
+  • Must have ≥2 electives total
+
+
+--- STEP 4: YOUR PLAN ---
+
+Auto-generated semester-by-semester schedule displayed as cards.
+
+Features:
+  • Credit summary hero (taken + planned vs 30 minimum)
+  • Progress bar toward 30 credits
+  • Change graduation semester inline (re-schedules automatically)
+  • Adjust credits/semester with +/- stepper (4–12)
+  • Drag courses between semesters (HTML5 drag-and-drop)
+    Valid drops highlight green; invalid show warning message
+    Rules: season availability, prerequisites, credit caps
+  • Print button (window.print())
+  • Export Excel button → downloads filled proposal .xlsx
+  • "Recalculate →" resets manual drag layout and returns to Step 1 scroll
+
+Alerts shown when applicable:
+  • Legacy 5930+5940 pair completed (disregard split changes)
+  • Electives optimized out to hit 30 credits
+  • Courses that couldn't fit before graduation
+  • Plan over/under 30 credits with guidance
+  • Extra electives beyond minimum
+
+
+================================================================================
+10. PLAN ENGINE — SCHEDULING LOGIC
+================================================================================
+
+Core files: src/lib/planEngine.ts, src/lib/planLayout.ts
+
+generatePlan(state) algorithm:
+
+1. Build course queue (buildQueue):
+   a. Non-elective requirements (nonElectiveQueue):
+      - All incomplete required courses (by priority pri)
+      - Capstone EN5910 (pri 3) after prereqs met
+      - Residential choice: EN6002 OR EN6010+EN6011 based on resChoice
+      - Chosen org behavior course if not taken
+
+   b. Electives (optimizeElectives):
+      - From user's elChoices selections
+      - Must pick at least (2 - already_taken_electives) courses
+      - Bitmask search for subset that reaches ≥30 total credits with fewest extras
+      - Prefers fewer credits when multiple subsets work
+      - getSkippedElectives() returns electives left out by optimization
+
+2. Schedule semester by semester (planFromSem → gradSem):
+   For each semester:
+     - Filter queue: course offered that season + prereqs satisfied
+     - Greedy place courses in priority order until credit cap hit
+     - Fall/Spring cap = crLimit (4–12); Summer cap = 2
+     - Placed courses removed from queue; added to "done" set for prereq checks
+
+3. Return GeneratedPlan: { plan, unscheduled, sems }
+
+Prerequisite logic (isCourseCompleted in courses.ts):
+  • EN5930 satisfied by EN5930_legacy
+  • EN5941+EN5942 satisfied by EN5940
+  • EN5405 waived for returning students
+  • Capstone prereqs: EN5900, EN5930, EN5941, EN5942, EN5980
+
+Drag-and-drop override (planLayout.ts):
+  • planToLayout() / layoutToPlan() convert between GeneratedPlan and manual layout
+  • canPlaceCourse() validates season, prereqs, credit limits
+  • moveCourseInLayout() updates layout on successful drop
+  • Manual layout preserved until "Recalculate" or changing grad/credits/taken
+
+
+================================================================================
+11. COURSE DATA — DEFAULT CURRICULUM
+================================================================================
+
+Source: src/data/courses.ts (DEFAULT_CURRICULUM)
+Legacy: src/data/legacyCourses.ts
+
+Each course has:
+  id, code, name, credits, seasons[], prereqs[], cat, pri, desc, notes, excelRow
+
+Categories (cat):
+  req  — Core required
+  cap  — Capstone (EN5910)
+  org  — Organizational behavior (choose 1)
+  el   — Specialization elective
+  res  — Residential / professional development
+
+Priority (pri) for scheduling order: req=1, org=2, cap=3, el=4
+
+REQUIRED CORE (req + cap):
+  EN5080  ENMGT 5080   Intro to Python Basics          1 cr  Summer     row 13
+  EN5900  ENMGT 5900   Project Management              4 cr  Fall/Spring row 14
+  EN5910  ENMGT 5910   Engineering Management Project  4 cr  Fall/Spring row 15 (cap)
+  EN5930  ENMGT 5930   Data Analytics                  3 cr  Fall       row 16
+  EN5941  ENMGT 5941   Foundations in Eng. Economics   1.5cr Spring     row 17
+  EN5942  ENMGT 5942   Applied Engineering Economics   1.5cr Spring     row 18
+  EN5980  ENMGT 5980   Decision Framing and Analytics  3 cr  Fall       row 19
+  EN5405  ENMGT 5405   Applied AI for Technical Teams  3 cr  Fall       row 20
+  EN6001  ENMGT 6001   Residential Session I           1 cr  Summer     row 21
+
+ORGANIZATIONAL BEHAVIOR (choose 1):
+  EN5300  ENMGT 5300   Technology Strategy             3 cr  Spring     row 29
+  EN5960  ENMGT 5960   Negotiations and Contracts      3 cr  Fall       row 30
+  EN6020  ENMGT 6020   Managing Culture of Innovation  3 cr  Fall       row 31
+  EN6030  ENMGT 6030   Learning To Lead                3 cr  Spring     row 32
+
+SPECIALIZATION ELECTIVES:
+  EN5200  ENMGT 5200   Economics of Energy Transition  3 cr  Fall       row 36
+  EN5300el ENMGT 5300  Tech Strategy (also OB)          3 cr  Spring     row 37
+  EN5500  ENMGT 5500   Digital Marketing               3 cr  Spring     row 38
+  EN5920  ENMGT 5920   Product Management              3 cr  Spring     row 39
+  EN6030el ENMGT 6030  Learning to Lead (also OB)      3 cr  Spring     row 40
+  EN6095  ENMGT 6095   AI Value Generation             1.5cr Spring     row 41
+  EN5400  ENMGT 5400   Applications of AI              3 cr  Spring     row 42
+  EN6092  ENMGT 6092   Overcoming Gender Bias          1.5cr Fall       row 43
+  CEE6800 CEE 6800     Engineering Smart Cities        3 cr  Fall       row 44
+  NBA5070 NBA 5070     Entrepreneurship                3 cr  Fall/Spring row 45
+  SYS5740 SYSEN 5740   Design Thinking                 2 cr  Spring     row 46
+  CEE6055 CEE 6055     Renewable Energy Systems        3 cr  Fall       row 47
+
+RESIDENTIAL / PD:
+  EN6002  ENMGT 6002   Residential Session II          1 cr  Summer     row 22
+  EN6010  ENMGT 6010   PD Workshop I                   0.5cr Fall/Spring row 23
+  EN6011  ENMGT 6011   PD Workshop II                  0.5cr Fall/Spring row 24
+
+LEGACY COURSES (pre-2026):
+  EN5930_legacy  ENMGT 5930  Data Analytics (4 cr)      row 16
+  EN5940         ENMGT 5940  Economics and Finance (4cr) row 17
+  EN6012         ENMGT 6012  PD Workshop II (old)       row 21
+
+CURRICULUM IMPORT (curriculumImport.ts):
+  Parses uploaded Cornell proposal .xlsx by scanning column B for section headers:
+    "Required course", "Organizational behavior", "Specialization elective"
+  Reads course code (B), name (C), credits (D), seasons from comment (Q)
+  Supports ENMGT, CEE, NBA, SYSEN course prefixes
+  Extracts res2 (EN6002), pd1/pd2 (EN6010/EN6011) separately
+  Returns CurriculumCatalog replacing DEFAULT_CURRICULUM
+
+
+================================================================================
+12. SEMESTER SYSTEM
+================================================================================
+
+Source: src/data/semesters.ts
+
+Semester codes: SPyy (Spring), SUyy (Summer), FAyy (Fall)
+  e.g. SP26 = Spring 2026, SU26 = Summer 2026, FA26 = Fall 2026
+
+Generated range: 2020 through max(2032, currentYear + 5)
+
+Key functions:
+  semIdx(code)              — index in master SEMS array
+  semRange(start, end)      — inclusive semester list for planning
+  defaultNextSemesterCode() — upcoming term based on current date
+  planningSemesters()       — next semester dropdown options
+  programStartSemesters()   — Spring 2024 onward (for Excel)
+  takenSemesterOptions()    — 3 years from program start
+  autoPlaceSemesters()      — program start through planFrom (for completed courses)
+  excelSemesters()          — columns E–P on proposal (max 12 semesters)
+  graduationSemesters()     — valid grad dates from planFrom onward
+
+Excel column mapping (SEM_COLS in types.ts):
+  E, F, G, H, I, J, K, L, M, N, O, P  (12 semester columns)
+  First column = program start semester (or planFrom if start blank)
+  Last column ≤ graduation semester
+
+
+================================================================================
+13. EXCEL EXPORT — COMPLETE TECHNICAL DESCRIPTION
+================================================================================
+
+This is one of the app's core features. Students download a filled copy of
+Cornell's official MEM degree proposal spreadsheet ready for advisor review.
+
+Template file:
+  public/Cornellproposal.xlsx (~18 KB)
+  Served at: https://www.cornellmemscheduleplanner.com/Cornellproposal.xlsx
+  If user imported a custom .xlsx in Step 1, that file is used instead
+  (cached in proposalTemplateRef in Planner.tsx)
+
+Implementation: src/lib/excelExport.ts (uses ExcelJS in browser)
+Supporting: src/lib/customExcel.ts, src/lib/planEngine.ts getAllPlacements()
+
+Trigger:
+  Step 4 → "↓ Export Excel" button → handleExport() in Planner.tsx
+  → exportProposalExcel(planner, templateBuffer, displayPlan)
+  → recordExcelExport() increments analytics counter
+
+Output filename:
+  {Name}_Cornell_MEM_Proposal.xlsx
+  Spaces in name replaced with underscores; fallback "MEM_Proposal"
+
+--- HEADER CELLS FILLED ---
+
+  C4 = student name
+  C5 = student ID number
+  C6 = NetID
+  G4 = program start semester (programStartSem, or planFromSem if blank)
+  G5 = graduation semester (gradSem)
+  G6 = advisor name
+
+--- FORMULA PATCHES ---
+
+Cornell's template has SUM formulas that incorrectly span all columns.
+patchTemplateFormulas() fixes per-semester totals before writing data:
+
+  For each column E–P:
+    {col}25 = SUM({col}13:{col}24)   — required courses subtotal
+    {col}33 = SUM({col}29:{col}32)   — org behavior subtotal
+    {col}49 = SUM({col}36:{col}48)   — electives subtotal
+
+  For columns H, I, J:
+    {col}52 = SUM(E50:P50)           — grand total row fix
+
+--- COURSE CREDIT PLACEMENT ---
+
+1. Clear all course rows × all semester columns (E–P) to null
+
+2. getAllPlacements(state, displayPlan) computes every course's semester index:
+   a. Completed courses (from state.taken):
+      - If takenSemesters[id] set → use that semester's column
+      - Else auto-place in programStart..planFrom range respecting:
+        season, prereqs, credit caps per semester
+   b. Planned courses from generated/manual plan → column for that semester
+
+3. For each placement:
+   sheet.getCell(`${COL}${excelRow}`).value = course.credits
+   Where COL = SEM_COLS[semIndex] (E=0, F=1, ... P=11)
+   And excelRow comes from course.excelRow in catalog
+
+--- CUSTOM COURSES (customExcel.ts) ---
+
+For customTaken entries and courses needing non-standard rows:
+
+Category → template row candidates:
+  cap (capstone):     row 15
+  org:                rows 29–32
+  el (elective):      rows 36–47
+  res:                rows 21–24
+  req (default):      rows 13,14,16–20
+
+If category section is full, "borrow" rows from waived/skipped courses:
+  e.g. EN5405 row if returning student waived
+  EN5941/5942 rows if economics requirement met via EN5940
+  EN6010/EN6011 rows if resChoice is session2
+
+For each custom course, also writes:
+  B{row} = course code
+  C{row} = course name
+  D{row} = credits
+  {col}{row} = credits (in semester column)
+
+--- DOWNLOAD MECHANISM ---
+
+  workbook.xlsx.writeBuffer() → Blob → temporary object URL → <a download> click
+  All processing happens client-side; no server involved in export.
+
+Example output in repo: public/Adam_Moffat_Cornell_MEM_Proposal.xlsx (sample export)
+
+
+================================================================================
+14. FEATURE REQUEST / FEEDBACK SYSTEM
+================================================================================
+
+UI: "Request a change" button in header → FeatureRequestModal.tsx
+
+Categories:
+  • Add an advisor
+  • Update curriculum / courses
+  • New feature
+  • Bug report
+  • Other
+
+Form fields:
+  • Name (optional)
+  • Email for reply (optional)
+  • Category
+  • Message (required)
+  • Attachments: up to 5 files, 4 MB total
+    Accepted: .xlsx, .xls, .pdf, .png, .jpg, .jpeg, .doc, .docx, .txt, .csv
+
+Submission flow:
+  Browser → POST /api/feature-request (multipart FormData)
+  → api/feature-request.js (Vercel) OR Vite dev middleware
+  → server/featureRequestCore.js sendFeatureRequestEmail()
+  → Email via Resend API (if RESEND_API_KEY) OR Gmail SMTP
+
+Email content:
+  Subject: [MEM Planner] {category} — {name}
+  Body: category, sender, message, attachment count
+  Attachments included in email
+
+Error handling:
+  503 — email not configured (missing env vars)
+  400 — validation (empty message, bad email)
+  413 — attachments too large
+  503 — SMTP auth failure (with Gmail App Password hints)
+
+Email setup:
+  npm run setup:email (interactive)
+  Or manual .env per .env.example
+
+SECURITY:
+  FEATURE_REQUEST_RECIPIENTS never exposed to frontend bundle.
+  Only server-side env vars and serverless function can read them.
+
+
+================================================================================
+15. ENVIRONMENT VARIABLES
+================================================================================
+
+File: .env (local, gitignored) — copy from .env.example
+
+FEATURE_REQUEST_RECIPIENTS   Comma-separated recipient emails (required for feedback)
+
+Option A — Gmail SMTP:
+  SMTP_HOST=smtp.gmail.com
+  SMTP_PORT=587
+  SMTP_SECURE=false
+  SMTP_USER=your@gmail.com
+  SMTP_PASS=16-char-app-password
+  SMTP_FROM=MEM Planner <your@gmail.com>
+
+Option B — Resend (recommended for Vercel):
+  RESEND_API_KEY=re_xxxxxxxx
+  RESEND_FROM=MEM Planner <you@yourdomain.com>
+
+PORT=3001   (only for npm run dev:api / npm start)
+
+No env vars needed for:
+  • Main planner functionality
+  • Excel export
+  • Usage stats counters
+
+
+================================================================================
+16. ADVISORS
+================================================================================
+
+Hardcoded in src/types.ts (ADVISORS constant):
+  • Andrea Ippolito
+  • Robert Newman (default selection)
+  • Dirk Swart
+
+To add advisors: edit ADVISORS in types.ts, or submit "Add an advisor" feedback.
+
+
+================================================================================
+17. CURRICULUM RULES & EDGE CASES
+================================================================================
+
+RETURNING STUDENT (matriculated before Summer 2026):
+  • ENMGT 5405 Applied AI waived (incoming students must take it)
+  • Checkbox on Step 1; affects scheduling, Excel row borrowing, Step 2 course list
+
+LEGACY ECONOMICS:
+  • EN5940 (4 cr, old) satisfies EN5941 + EN5942 (new 1.5 cr each)
+  • Checking EN5940 unchecks 5941/5942; mutual exclusion enforced
+
+LEGACY ANALYTICS:
+  • EN5930_legacy (4 cr old) satisfies EN5930 (3 cr new)
+  • Mutual exclusion enforced
+
+CREDIT SHORTFALL:
+  • New 5930 (3cr) + 5941/5942 (3cr total) = 1+1 cr less than old 4+4 path
+  • curriculumCreditShortfall() returns 1 or 2
+  • UI suggests 1-cr or 1.5-cr electives to makeup
+
+RESIDENTIAL REQUIREMENT:
+  • EN6001 (Session I) always required
+  • Second credit: EN6002 (Session II) OR EN6010+EN6011 (workshops)
+  • EN6012 (legacy) + EN6011 counts as workshops done
+
+ELECTIVE OPTIMIZATION:
+  • If user selects more electives than needed, optimizer picks minimum subset
+    that still reaches 30 total credits
+  • Skipped electives shown in alert on Step 4
+
+INCOMING STUDENT CREDIT OVERSHOOT:
+  • Core curriculum often 32+ credits before electives (includes EN5405)
+  • UI explains this is normal for non-returning students
+
+ORG BEHAVIOR / ELECTIVE OVERLAP:
+  • EN5300 and EN6030 appear in both OB and elective lists
+  • If chosen as OB, corresponding elective variant (EN5300el, EN6030el) hidden
+
+
+================================================================================
+18. UI / STYLING NOTES
+================================================================================
+
+  • Cornell red (#b31b1b) primary brand color
+  • Responsive design with mobile-specific header text (hdr-app-short, etc.)
+  • Sticky top header + step nav; sticky bottom action bar
+  • Course cards expandable for descriptions
+  • Season-colored semester blocks (Fall/Spring/Summer borders and pills)
+  • Drag-and-drop visual feedback (valid/invalid drop zones)
+  • Print-friendly Step 4 layout
+
+
+================================================================================
+19. DEPENDENCIES (package.json)
+================================================================================
+
+Production:
+  cors ^2.8.5
+  dotenv ^16.5.0
+  exceljs ^4.4.0
+  express ^5.1.0
+  formidable ^3.5.4
+  multer ^2.0.1          (listed but formidable used instead in handlers)
+  nodemailer ^7.0.3
+  react ^19.1.0
+  react-dom ^19.1.0
+  react-router-dom ^7.18.0
+  resend ^4.5.1
+
+Development:
+  @types/react ^19.1.2
+  @types/react-dom ^19.1.2
+  @vitejs/plugin-react ^4.4.1
+  concurrently ^9.1.2
+  typescript ~5.8.3
+  vite ^6.3.5
+
+
+================================================================================
+20. RECENT GIT HISTORY (context)
+================================================================================
+
+Recent commits (newest first):
+  eccbedb — fixed styling for semester on courses taken
+  09e7c1b — fixed exporting
+  c43d928 — fixed export stuff
+  465e937 — added logos
+  6be3b32 — fixed date range
+  4c36d7e — fixed mobile ui
+  5695b82 — fixed branding
+  8421c42 — updated stats
+  a513cfc — fixed ui and able to change grad sem at end
+
+Active uncommitted work (at time of writing):
+  • SEO improvements (index.html meta, robots.txt, sitemap.xml)
+  • pageMeta.ts for dynamic per-route meta tags
+  • StatsPage and Planner updates
+
+
+================================================================================
+21. WHAT IS NOT IN THIS PROJECT
+================================================================================
+
+  • No user authentication or saved plans
+  • No database or persistent student data storage
+  • No official Cornell API integration
+  • No course registration — planning tool only
+  • No mobile app (responsive web only)
+  • No payment or monetization
+  • Planner state lost on page refresh (no localStorage persistence of plan)
+
+
+================================================================================
+22. QUICK REFERENCE URLS
+================================================================================
+
+Live app:        https://www.cornellmemscheduleplanner.com/
+Live stats:      https://www.cornellmemscheduleplanner.com/stats
+Excel template:  https://www.cornellmemscheduleplanner.com/Cornellproposal.xlsx
+GitHub repo:     https://github.com/Admft/CornellMengPlanner.git
+Author LinkedIn: https://www.linkedin.com/in/adamrmoffat/
+Stats API:       https://countapi.mileshilliard.com/api/v1
+Resend (email):  https://resend.com
+Gmail App Pw:    https://myaccount.google.com/apppasswords
+
+================================================================================
+END OF DOCUMENT
+================================================================================

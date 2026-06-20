@@ -8,6 +8,7 @@ import {
   type SiteStats,
 } from '../lib/analytics'
 import SiteFooter from '../components/SiteFooter'
+import { setPageMeta } from '../lib/pageMeta'
 import '../App.css'
 
 const DEVICE_LABELS: Record<DeviceType, string> = {
@@ -91,6 +92,14 @@ export default function StatsPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    setPageMeta({
+      title: 'Usage Stats | Cornell MEM Schedule Planner',
+      description: 'Anonymous usage statistics for the Cornell MEM course planner.',
+      path: '/stats',
+    })
+  }, [])
 
   useEffect(() => {
     if (loadedRef.current) return
