@@ -36,22 +36,11 @@ const DEVICE_COUNTER: Record<DeviceType, string> = {
 
 const DAILY_VISIT_PREFIX = 'mem-planner-counted'
 const API_TIMEOUT_MS = 8000
-
-/** Minimum values shown on /stats — live counts never display below these. */
-export const STATS_FLOORS = {
-  dailyVisitors: 84,
-  excelExports: 4,
-  desktop: 59,
-  mobile: 25,
-  tablet: 0,
-} as const
-
 const HIT_COOLDOWN_MS = 2000
-const EXPORT_HIT_COOLDOWN_MS = 30_000
+const EXPORT_HIT_COOLDOWN_MS = 60_000
 const STATS_REFRESH_COOLDOWN_MS = 5000
+const COOLDOWN_STORAGE_PREFIX = 'mem-planner-hit-at'
 
-let lastGlobalHitAt = 0
-let lastExportHitAt = 0
 let lastStatsFetchAt = 0
 
 function todayKey(): string {
@@ -104,16 +93,23 @@ function canRecordHit(now: number, lastAt: number, cooldownMs: number): boolean 
   return now - lastAt >= cooldownMs
 }
 
-function applyStatsFloors(
-  raw: Omit<SiteStats, 'deviceTotal' | 'lastFetched'>,
-): Omit<SiteStats, 'deviceTotal' | 'lastFetched'> {
-  return {
-    dailyVisitors: Math.max(STATS_FLOORS.dailyVisitors, raw.dailyVisitors ?? 0),
-    excelExports: Math.max(STATS_FLOORS.excelExports, raw.excelExports ?? 0),
-    desktop: Math.max(STATS_FLOORS.desktop, raw.desktop ?? 0),
-    mobile: Math.max(STATS_FLOORS.mobile, raw.mobile ?? 0),
-    tablet: Math.max(STATS_FLOORS.tablet, raw.tablet ?? 0),
-  }
+function readStoredHitAt(kind: string): number {
+  const raw = sessionStorage.getItem(`${COOLDOWN_STORAGE_PREFIX}:${kind}`)
+  if (!raw) return 0
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function storeHitAt(kind: string, at: number): void {
+  sessionStorage.setItem(`${COOLDOWN_STORAGE_PREFIX}:${kind}`, String(at))
+}
+
+function canRecordStoredHit(kind: string, cooldownMs: number): boolean {
+  const now = Date.now()
+  const lastAt = readStoredHitAt(kind)
+  if (!canRecordHit(now, lastAt, cooldownMs)) return false
+  storeHitAt(kind, now)
+  return true
 }
 
 async function fetchCount(action: 'hit' | 'get', key: string): Promise<number | null> {
@@ -151,10 +147,7 @@ export function detectDevice(): DeviceType {
  */
 export async function recordPlannerVisit(): Promise<void> {
   if (!markOnceToday('visit')) return
-
-  const now = Date.now()
-  if (!canRecordHit(now, lastGlobalHitAt, HIT_COOLDOWN_MS)) return
-  lastGlobalHitAt = now
+  if (!canRecordStoredHit('global', HIT_COOLDOWN_MS)) return
 
   const device = detectDevice()
   await Promise.all([
@@ -163,21 +156,23 @@ export async function recordPlannerVisit(): Promise<void> {
   ])
 }
 
-/** Every Excel export increments — rate-limited to reduce counter spam. */
+/**
+ * Count at most one Excel export per browser per calendar day.
+ * Downloads are unlimited — this only limits what increments the public counter.
+ */
 export async function recordExcelExport(): Promise<void> {
-  const now = Date.now()
-  if (!canRecordHit(now, lastExportHitAt, EXPORT_HIT_COOLDOWN_MS)) return
-  if (!canRecordHit(now, lastGlobalHitAt, HIT_COOLDOWN_MS)) return
-  lastExportHitAt = now
-  lastGlobalHitAt = now
+  if (!markOnceToday('export')) return
+  if (!canRecordStoredHit('export', EXPORT_HIT_COOLDOWN_MS)) return
+  if (!canRecordStoredHit('global', HIT_COOLDOWN_MS)) return
   await fetchCount('hit', COUNTERS.excelExports)
 }
 
 /** Milliseconds until another export will be counted (0 = ready). */
 export function excelExportCooldownRemaining(): number {
+  if (localStorage.getItem(dailyStorageKey('export'))) return Number.POSITIVE_INFINITY
   return Math.max(
-    hitCooldownRemaining(lastExportHitAt, EXPORT_HIT_COOLDOWN_MS),
-    hitCooldownRemaining(lastGlobalHitAt, HIT_COOLDOWN_MS),
+    hitCooldownRemaining(readStoredHitAt('export'), EXPORT_HIT_COOLDOWN_MS),
+    hitCooldownRemaining(readStoredHitAt('global'), HIT_COOLDOWN_MS),
   )
 }
 
@@ -199,12 +194,14 @@ export async function fetchSiteStats(options?: { skipRefreshLimit?: boolean }): 
     fetchCount('get', COUNTERS.excelExports),
   ])
 
-  const floored = applyStatsFloors({ dailyVisitors, mobile, tablet, desktop, excelExports })
-  const deviceTotal =
-    (floored.mobile ?? 0) + (floored.tablet ?? 0) + (floored.desktop ?? 0)
+  const deviceTotal = (mobile ?? 0) + (tablet ?? 0) + (desktop ?? 0)
 
   return {
-    ...floored,
+    dailyVisitors,
+    mobile,
+    tablet,
+    desktop,
+    excelExports,
     deviceTotal,
     lastFetched: new Date(),
   }

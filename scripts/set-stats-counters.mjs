@@ -1,6 +1,7 @@
 /**
- * One-time sync of remote countapi values to match STATS_FLOORS in analytics.ts.
- * Run: node scripts/set-stats-counters.mjs
+ * Reset inflated countapi values after spam testing.
+ * Targets match the last known-good snapshot before hard testing.
+ * Run: npm run reset:stats
  */
 
 const API_BASE = 'https://countapi.mileshilliard.com/api/v1'

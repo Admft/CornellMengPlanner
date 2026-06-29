@@ -174,7 +174,7 @@ export default function StatsPage() {
           <StatCard
             label="Excel exports"
             value={stats?.excelExports ?? (loading ? '…' : '—')}
-            sub="Every proposal download"
+            sub="One counted download per browser per day"
           />
           <StatCard
             label="Your device"

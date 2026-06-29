@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:api": "node server/index.js",
     "setup:email": "node scripts/setup-email.mjs",
+    "reset:stats": "node scripts/set-stats-counters.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "start": "NODE_ENV=production node server/index.js"
