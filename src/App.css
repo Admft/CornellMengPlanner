@@ -1331,6 +1331,12 @@ select:focus {
   opacity: 0.45;
 }
 
+.pc-swap-target {
+  outline: 2px solid var(--red);
+  outline-offset: 1px;
+  background: var(--red-tint);
+}
+
 .pc-drag {
   color: var(--text3);
   font-size: 14px;

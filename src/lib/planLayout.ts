@@ -58,27 +58,37 @@ function semLimit(season: Semester['season'], crLimit: number): number {
   return season === 'Summer' ? 2 : crLimit
 }
 
-function coursesBefore(
+function coursesBeforeInLayout(
   sems: Semester[],
-  plan: Record<string, SemesterPlan>,
+  layout: Record<string, string[]>,
   semIndex: number,
 ): Set<string> {
   const ids = new Set<string>()
   for (let i = 0; i < semIndex; i++) {
-    for (const course of plan[sems[i].code]?.courses ?? []) {
-      ids.add(course.id)
+    for (const id of layout[sems[i].code] ?? []) {
+      ids.add(id)
     }
   }
   return ids
 }
 
-export function canPlaceCourse(
+function semesterCredits(
+  semCode: string,
+  layout: Record<string, string[]>,
+  catalog: PlannerState['curriculum'],
+): number {
+  return (layout[semCode] ?? []).reduce((sum, id) => {
+    const course = resolveCourse(id, catalog)
+    return sum + (course?.credits ?? 0)
+  }, 0)
+}
+
+function canPlaceInLayout(
   course: Course,
   targetSem: Semester,
+  layout: Record<string, string[]>,
   sems: Semester[],
-  plan: Record<string, SemesterPlan>,
   state: PlannerState,
-  options?: { excludeCourseId?: string; fromSemCode?: string },
 ): { ok: true } | { ok: false; reason: string } {
   const targetIdx = sems.findIndex((s) => s.code === targetSem.code)
   if (targetIdx < 0) return { ok: false, reason: 'Invalid semester.' }
@@ -90,7 +100,7 @@ export function canPlaceCourse(
     }
   }
 
-  const before = coursesBefore(sems, plan, targetIdx)
+  const before = coursesBeforeInLayout(sems, layout, targetIdx)
   const done = new Set([...state.taken, ...before])
   const ctx: CompletionContext = { returningStudent: state.returningStudent }
   if (!prereqsSatisfied(course.prereqs ?? [], done, ctx)) {
@@ -98,13 +108,8 @@ export function canPlaceCourse(
   }
 
   const limit = semLimit(targetSem.season, state.crLimit)
-  let load = plan[targetSem.code]?.cr ?? 0
-  if (options?.fromSemCode === targetSem.code && options?.excludeCourseId === course.id) {
-    load -= course.credits
-  } else if (options?.fromSemCode && options.fromSemCode !== targetSem.code) {
-    // moving from another sem — target load unchanged for this course yet
-  }
-  if (load + course.credits > limit) {
+  const load = semesterCredits(targetSem.code, layout, state.curriculum)
+  if (load + course.credits > limit + 0.001) {
     return {
       ok: false,
       reason: `${targetSem.label} is capped at ${limit} credits.`,
@@ -112,6 +117,77 @@ export function canPlaceCourse(
   }
 
   return { ok: true }
+}
+
+export function canPlaceCourse(
+  course: Course,
+  targetSem: Semester,
+  sems: Semester[],
+  plan: Record<string, SemesterPlan>,
+  state: PlannerState,
+  options?: { excludeCourseId?: string; fromSemCode?: string },
+): { ok: true } | { ok: false; reason: string } {
+  const layout = planToLayout({ plan, unscheduled: [], sems })
+  const fromSem = options?.fromSemCode
+  const movingId = options?.excludeCourseId ?? course.id
+
+  if (fromSem) {
+    layout[fromSem] = (layout[fromSem] ?? []).filter((id) => id !== movingId)
+  }
+  if (!layout[targetSem.code]?.includes(course.id)) {
+    layout[targetSem.code] = [...(layout[targetSem.code] ?? []), course.id]
+  }
+
+  return canPlaceInLayout(course, targetSem, layout, sems, state)
+}
+
+export function canSwapCourses(
+  courseA: Course,
+  semCodeA: string,
+  courseB: Course,
+  semCodeB: string,
+  sems: Semester[],
+  layout: Record<string, string[]>,
+  state: PlannerState,
+): { ok: true } | { ok: false; reason: string } {
+  if (semCodeA === semCodeB) {
+    return { ok: false, reason: 'Pick a course in a different semester to swap.' }
+  }
+
+  const semA = sems.find((s) => s.code === semCodeA)
+  const semB = sems.find((s) => s.code === semCodeB)
+  if (!semA || !semB) return { ok: false, reason: 'Invalid semester.' }
+
+  const next: Record<string, string[]> = {}
+  for (const [code, ids] of Object.entries(layout)) {
+    next[code] = [...ids]
+  }
+  next[semCodeA] = (next[semCodeA] ?? []).map((id) => (id === courseA.id ? courseB.id : id))
+  next[semCodeB] = (next[semCodeB] ?? []).map((id) => (id === courseB.id ? courseA.id : id))
+
+  const checkA = canPlaceInLayout(courseA, semB, next, sems, state)
+  if (!checkA.ok) return checkA
+
+  const checkB = canPlaceInLayout(courseB, semA, next, sems, state)
+  if (!checkB.ok) return checkB
+
+  return { ok: true }
+}
+
+export function swapCoursesInLayout(
+  layout: Record<string, string[]>,
+  courseIdA: string,
+  semCodeA: string,
+  courseIdB: string,
+  semCodeB: string,
+): Record<string, string[]> {
+  const next: Record<string, string[]> = {}
+  for (const [code, ids] of Object.entries(layout)) {
+    next[code] = [...ids]
+  }
+  next[semCodeA] = (next[semCodeA] ?? []).map((id) => (id === courseIdA ? courseIdB : id))
+  next[semCodeB] = (next[semCodeB] ?? []).map((id) => (id === courseIdB ? courseIdA : id))
+  return next
 }
 
 export function moveCourseInLayout(
@@ -130,20 +206,79 @@ export function moveCourseInLayout(
   return next
 }
 
+export function findSwapPartners(
+  course: Course,
+  fromSemCode: string,
+  sems: Semester[],
+  layout: Record<string, string[]>,
+  state: PlannerState,
+): { course: Course; semCode: string }[] {
+  const partners: { course: Course; semCode: string }[] = []
+
+  for (const sem of sems) {
+    if (sem.code === fromSemCode) continue
+    for (const id of layout[sem.code] ?? []) {
+      const other = resolveCourse(id, state.curriculum)
+      if (!other || other.id === course.id) continue
+      const check = canSwapCourses(course, fromSemCode, other, sem.code, sems, layout, state)
+      if (check.ok) partners.push({ course: other, semCode: sem.code })
+    }
+  }
+
+  return partners
+}
+
 export function validDropSemesters(
   course: Course,
   fromSemCode: string,
   sems: Semester[],
   plan: GeneratedPlan,
   state: PlannerState,
+  layout?: Record<string, string[]>,
 ): Set<string> {
+  const activeLayout = layout ?? planToLayout(plan)
   const valid = new Set<string>()
+
   for (const sem of sems) {
-    const check = canPlaceCourse(course, sem, sems, plan.plan, state, {
+    if (sem.code === fromSemCode) {
+      valid.add(sem.code)
+      continue
+    }
+
+    const moveCheck = canPlaceCourse(course, sem, sems, plan.plan, state, {
       excludeCourseId: course.id,
       fromSemCode,
     })
-    if (check.ok) valid.add(sem.code)
+    if (moveCheck.ok) {
+      valid.add(sem.code)
+      continue
+    }
+
+    const partners = findSwapPartners(course, fromSemCode, sems, activeLayout, state)
+    if (partners.some((p) => p.semCode === sem.code)) {
+      valid.add(sem.code)
+    }
+  }
+
+  return valid
+}
+
+export function validSwapTargets(
+  course: Course,
+  fromSemCode: string,
+  sems: Semester[],
+  layout: Record<string, string[]>,
+  state: PlannerState,
+): Set<string> {
+  const valid = new Set<string>()
+  for (const { course: other, semCode } of findSwapPartners(
+    course,
+    fromSemCode,
+    sems,
+    layout,
+    state,
+  )) {
+    valid.add(`${semCode}:${other.id}`)
   }
   return valid
 }

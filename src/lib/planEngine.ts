@@ -182,11 +182,13 @@ export function generatePlan(state: PlannerState): GeneratedPlan {
     const limit = limits[sem.season] ?? 12
     plan[sem.code] = { sem, courses: [], cr: 0 }
 
-    const available = queue.filter(
-      (course) =>
-        course.seasons.includes(sem.season) &&
-        prereqsSatisfied(course.prereqs ?? [], done, ctx),
-    )
+    const available = queue
+      .filter(
+        (course) =>
+          course.seasons.includes(sem.season) &&
+          prereqsSatisfied(course.prereqs ?? [], done, ctx),
+      )
+      .sort((a, b) => a.pri - b.pri || a.credits - b.credits)
 
     let used = 0
     const placed: Course[] = []

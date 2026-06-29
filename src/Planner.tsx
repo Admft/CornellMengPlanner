@@ -24,11 +24,15 @@ import {
 } from './lib/planEngine'
 import {
   canPlaceCourse,
+  canSwapCourses,
   layoutToPlan,
   moveCourseInLayout,
   planToLayout,
+  swapCoursesInLayout,
   validDropSemesters,
+  validSwapTargets,
 } from './lib/planLayout'
+import { validateScheduleForExport } from './lib/scheduleValidate'
 import {
   ADVISORS,
   CUSTOM_COURSE_CATS,
@@ -309,8 +313,17 @@ export default function Planner() {
     if (!drag) return new Set<string>()
     const course = resolveCourse(drag.courseId, state.curriculum)
     if (!course) return new Set<string>()
-    return validDropSemesters(course, drag.fromSem, plan.sems, plan, planner)
-  }, [drag, plan, planner, state.curriculum])
+    const layout = state.planLayout ?? planToLayout(basePlan)
+    return validDropSemesters(course, drag.fromSem, plan.sems, plan, planner, layout)
+  }, [drag, plan, planner, state.curriculum, state.planLayout, basePlan])
+
+  const validSwapKeys = useMemo(() => {
+    if (!drag) return new Set<string>()
+    const course = resolveCourse(drag.courseId, state.curriculum)
+    if (!course) return new Set<string>()
+    const layout = state.planLayout ?? planToLayout(basePlan)
+    return validSwapTargets(course, drag.fromSem, plan.sems, layout, planner)
+  }, [drag, plan, planner, state.curriculum, state.planLayout, basePlan])
 
   async function handleCurriculumImport(file: File) {
     setImportError('')
@@ -390,13 +403,52 @@ export default function Planner() {
       fromSemCode: drag.fromSem,
     })
     if (!check.ok) {
-      setDropHint(check.reason)
+      setDropHint(
+        `${check.reason} Drop onto a course in that semester to swap schedules.`,
+      )
       return
     }
 
     setState((prev) => ({
       ...prev,
       planLayout: moveCourseInLayout(layout, drag.courseId, drag.fromSem, targetSemCode),
+    }))
+    setDrag(null)
+    setDropHint('')
+  }
+
+  function handlePlanSwap(targetCourseId: string, targetSemCode: string) {
+    if (!drag) return
+    if (drag.courseId === targetCourseId) return
+
+    const courseA = resolveCourse(drag.courseId, state.curriculum)
+    const courseB = resolveCourse(targetCourseId, state.curriculum)
+    if (!courseA || !courseB) return
+
+    const layout = state.planLayout ?? planToLayout(basePlan)
+    const check = canSwapCourses(
+      courseA,
+      drag.fromSem,
+      courseB,
+      targetSemCode,
+      plan.sems,
+      layout,
+      planner,
+    )
+    if (!check.ok) {
+      setDropHint(check.reason)
+      return
+    }
+
+    setState((prev) => ({
+      ...prev,
+      planLayout: swapCoursesInLayout(
+        layout,
+        drag.courseId,
+        drag.fromSem,
+        targetCourseId,
+        targetSemCode,
+      ),
     }))
     setDrag(null)
     setDropHint('')
@@ -456,6 +508,12 @@ export default function Planner() {
 
   async function handleExport() {
     setExportError('')
+    const validation = validateScheduleForExport(planner, plan)
+    if (!validation.ok) {
+      setExportError(validation.errors.join(' '))
+      return
+    }
+
     setExporting(true)
     try {
       await exportProposalExcel(planner, proposalTemplateRef.current, plan)
@@ -1323,9 +1381,10 @@ export default function Planner() {
               </div>
             </div>
             <p className="step-sub">
-              Courses are scheduled by semester. <strong>Drag courses</strong> between
-              semesters to adjust — only valid slots highlight (season, prerequisites,
-              credit caps). Export downloads the official Cornell proposal form.
+              Courses are scheduled by semester. <strong>Drag</strong> to move, or drop onto
+              another course to <strong>swap</strong> semesters when both terms are full.
+              Export is blocked until every required course is scheduled and totals at least
+              30 credits on the proposal form.
             </p>
 
             {metLegacyPair && (
@@ -1627,7 +1686,13 @@ export default function Planner() {
                       if (isValidDrop) handlePlanDrop(sem.code)
                     }}
                   >
-                    {semPlan.courses.map((course) => (
+                    {semPlan.courses.map((course) => {
+                      const swapKey = `${sem.code}:${course.id}`
+                      const canSwap =
+                        !!drag &&
+                        drag.fromSem !== sem.code &&
+                        validSwapKeys.has(swapKey)
+                      return (
                       <PlanCard
                         key={course.id}
                         course={course}
@@ -1635,6 +1700,7 @@ export default function Planner() {
                         onToggle={() => togglePlanExpanded(`${sem.code}-${course.id}`)}
                         draggable
                         isDragging={drag?.courseId === course.id}
+                        swapTarget={canSwap}
                         onDragStart={() => {
                           setDropHint('')
                           setDrag({ courseId: course.id, fromSem: sem.code })
@@ -1643,8 +1709,20 @@ export default function Planner() {
                           setDrag(null)
                           setDropHint('')
                         }}
+                        onDragOver={(e) => {
+                          if (!drag || drag.fromSem === sem.code) return
+                          if (!canSwap) return
+                          e.preventDefault()
+                          e.stopPropagation()
+                          e.dataTransfer.dropEffect = 'move'
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (canSwap) handlePlanSwap(course.id, sem.code)
+                        }}
                       />
-                    ))}
+                    )})}
                   </div>
                 </div>
               )

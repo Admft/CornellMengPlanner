@@ -1,3 +1,4 @@
+import type { DragEvent } from 'react'
 import type { Course, Semester } from '../types'
 
 interface CourseListItemProps {
@@ -99,7 +100,10 @@ interface PlanCardProps {
   draggable?: boolean
   onDragStart?: () => void
   onDragEnd?: () => void
+  onDragOver?: (e: DragEvent) => void
+  onDrop?: (e: DragEvent) => void
   isDragging?: boolean
+  swapTarget?: boolean
 }
 
 export function PlanCard({
@@ -109,7 +113,10 @@ export function PlanCard({
   draggable = false,
   onDragStart,
   onDragEnd,
+  onDragOver,
+  onDrop,
   isDragging = false,
+  swapTarget = false,
 }: PlanCardProps) {
   const catClass =
     course.cat === 'req' || course.cat === 'cap'
@@ -142,7 +149,7 @@ export function PlanCard({
 
   return (
     <div
-      className={`pc ${catClass} ${expanded ? 'xpd' : ''} ${isDragging ? 'pc-dragging' : ''} ${draggable ? 'pc-draggable' : ''}`}
+      className={`pc ${catClass} ${expanded ? 'xpd' : ''} ${isDragging ? 'pc-dragging' : ''} ${draggable ? 'pc-draggable' : ''} ${swapTarget ? 'pc-swap-target' : ''}`}
       draggable={draggable}
       onDragStart={(e) => {
         if (!draggable) return
@@ -151,6 +158,8 @@ export function PlanCard({
         onDragStart?.()
       }}
       onDragEnd={() => onDragEnd?.()}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       <div
         className="pc-hdr"
