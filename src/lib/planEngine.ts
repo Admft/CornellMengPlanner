@@ -19,16 +19,9 @@ export interface CoursePlacement {
 
 const MIN_ELECTIVES = 2
 
-/** Plan from the earlier of program start and “next semester” so SP1 courses aren’t skipped. */
+/** Future planning always begins at “next semester” — completed terms belong in Step 2. */
 function planningStartSemester(state: PlannerState): string {
-  const programStart = state.programStartSem.trim()
-  if (!programStart) return state.planFromSem
-
-  const programIdx = semIdx(programStart)
-  const fromIdx = semIdx(state.planFromSem)
-  if (programIdx < 0) return state.planFromSem
-  if (fromIdx < 0) return programStart
-  return programIdx < fromIdx ? programStart : state.planFromSem
+  return state.planFromSem
 }
 
 function allKnownCourses(catalog: CurriculumCatalog): Course[] {

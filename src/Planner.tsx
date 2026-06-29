@@ -741,6 +741,7 @@ export default function Planner() {
                           ...prev,
                           planFromSem,
                           gradSem: gradOk ? prev.gradSem : planFromSem,
+                          planLayout: null,
                         }
                       })
                     }}
