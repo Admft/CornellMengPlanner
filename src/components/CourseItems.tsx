@@ -105,6 +105,9 @@ interface PlanCardProps {
   isDragging?: boolean
   swapTarget?: boolean
   coachPulse?: boolean
+  swapLabel?: string
+  onDragEnter?: () => void
+  onDragLeave?: () => void
 }
 
 export function PlanCard({
@@ -119,6 +122,9 @@ export function PlanCard({
   isDragging = false,
   swapTarget = false,
   coachPulse = false,
+  swapLabel,
+  onDragEnter,
+  onDragLeave,
 }: PlanCardProps) {
   const catClass =
     course.cat === 'req' || course.cat === 'cap'
@@ -160,9 +166,12 @@ export function PlanCard({
         onDragStart?.()
       }}
       onDragEnd={() => onDragEnd?.()}
+      onDragEnter={() => onDragEnter?.()}
+      onDragLeave={() => onDragLeave?.()}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
+      {swapLabel && <span className="pc-swap-badge">{swapLabel}</span>}
       <div
         className="pc-hdr"
         onClick={onToggle}

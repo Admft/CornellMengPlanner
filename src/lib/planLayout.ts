@@ -228,6 +228,44 @@ export function findSwapPartners(
   return partners
 }
 
+export function swapPartnersInSemester(
+  course: Course,
+  fromSemCode: string,
+  targetSemCode: string,
+  sems: Semester[],
+  layout: Record<string, string[]>,
+  state: PlannerState,
+): Course[] {
+  return findSwapPartners(course, fromSemCode, sems, layout, state)
+    .filter((partner) => partner.semCode === targetSemCode)
+    .map((partner) => partner.course)
+}
+
+export function validMoveSemesters(
+  course: Course,
+  fromSemCode: string,
+  sems: Semester[],
+  plan: GeneratedPlan,
+  state: PlannerState,
+): Set<string> {
+  const valid = new Set<string>()
+
+  for (const sem of sems) {
+    if (sem.code === fromSemCode) {
+      valid.add(sem.code)
+      continue
+    }
+
+    const moveCheck = canPlaceCourse(course, sem, sems, plan.plan, state, {
+      excludeCourseId: course.id,
+      fromSemCode,
+    })
+    if (moveCheck.ok) valid.add(sem.code)
+  }
+
+  return valid
+}
+
 export function validDropSemesters(
   course: Course,
   fromSemCode: string,

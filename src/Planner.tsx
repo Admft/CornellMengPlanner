@@ -4,6 +4,7 @@ import { CourseListItem, PlanCard } from './components/CourseItems'
 import { FeatureRequestModal } from './components/FeatureRequestModal'
 import SiteFooter from './components/SiteFooter'
 import PlanDragCoach from './components/PlanDragCoach'
+import { SwapConfirmDialog, type PendingSwap } from './components/SwapConfirmDialog'
 import WhatsNewBanner from './components/WhatsNewBanner'
 import { hasSeenDragCoach } from './lib/dragCoach'
 import {
@@ -26,13 +27,14 @@ import {
   resolveCourse,
 } from './lib/planEngine'
 import {
-  canPlaceCourse,
   canSwapCourses,
   layoutToPlan,
   moveCourseInLayout,
   planToLayout,
   swapCoursesInLayout,
+  swapPartnersInSemester,
   validDropSemesters,
+  validMoveSemesters,
   validSwapTargets,
 } from './lib/planLayout'
 import { validateScheduleForExport } from './lib/scheduleValidate'
@@ -175,6 +177,12 @@ export default function Planner() {
   const [planExpanded, setPlanExpanded] = useState<Set<string>>(new Set())
   const [drag, setDrag] = useState<{ courseId: string; fromSem: string } | null>(null)
   const [dropHint, setDropHint] = useState('')
+  const [swapHover, setSwapHover] = useState<{
+    draggedCode: string
+    targetCode: string
+    targetSemLabel: string
+  } | null>(null)
+  const [pendingSwap, setPendingSwap] = useState<PendingSwap | null>(null)
   const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -334,6 +342,13 @@ export default function Planner() {
     return validDropSemesters(course, drag.fromSem, plan.sems, plan, planner, layout)
   }, [drag, plan, planner, state.curriculum, state.planLayout, basePlan])
 
+  const validMoveSems = useMemo(() => {
+    if (!drag) return new Set<string>()
+    const course = resolveCourse(drag.courseId, state.curriculum)
+    if (!course) return new Set<string>()
+    return validMoveSemesters(course, drag.fromSem, plan.sems, plan, planner)
+  }, [drag, plan, planner, state.curriculum])
+
   const validSwapKeys = useMemo(() => {
     if (!drag) return new Set<string>()
     const course = resolveCourse(drag.courseId, state.curriculum)
@@ -411,20 +426,27 @@ export default function Planner() {
     const course = resolveCourse(drag.courseId, state.curriculum)
     if (!course) return
 
+    if (!validMoveSems.has(targetSemCode)) {
+      const layout = state.planLayout ?? planToLayout(basePlan)
+      const partners = swapPartnersInSemester(
+        course,
+        drag.fromSem,
+        targetSemCode,
+        plan.sems,
+        layout,
+        planner,
+      )
+      if (partners.length > 0) {
+        setDropHint(
+          `That semester is full. Drop onto ${partners.map((p) => p.code).join(' or ')} to swap.`,
+        )
+      }
+      return
+    }
+
     const layout = state.planLayout ?? planToLayout(basePlan)
     const targetSem = plan.sems.find((s) => s.code === targetSemCode)
     if (!targetSem) return
-
-    const check = canPlaceCourse(course, targetSem, plan.sems, plan.plan, planner, {
-      excludeCourseId: course.id,
-      fromSemCode: drag.fromSem,
-    })
-    if (!check.ok) {
-      setDropHint(
-        `${check.reason} Drop onto a course in that semester to swap schedules.`,
-      )
-      return
-    }
 
     setState((prev) => ({
       ...prev,
@@ -432,9 +454,10 @@ export default function Planner() {
     }))
     setDrag(null)
     setDropHint('')
+    setSwapHover(null)
   }
 
-  function handlePlanSwap(targetCourseId: string, targetSemCode: string) {
+  function requestPlanSwap(targetCourseId: string, targetSemCode: string) {
     if (!drag) return
     if (drag.courseId === targetCourseId) return
 
@@ -457,18 +480,35 @@ export default function Planner() {
       return
     }
 
+    setPendingSwap({
+      courseAId: drag.courseId,
+      semCodeA: drag.fromSem,
+      courseBId: targetCourseId,
+      semCodeB: targetSemCode,
+    })
+  }
+
+  function confirmPendingSwap() {
+    if (!pendingSwap) return
+    const layout = state.planLayout ?? planToLayout(basePlan)
     setState((prev) => ({
       ...prev,
       planLayout: swapCoursesInLayout(
         layout,
-        drag.courseId,
-        drag.fromSem,
-        targetCourseId,
-        targetSemCode,
+        pendingSwap.courseAId,
+        pendingSwap.semCodeA,
+        pendingSwap.courseBId,
+        pendingSwap.semCodeB,
       ),
     }))
+    setPendingSwap(null)
     setDrag(null)
     setDropHint('')
+    setSwapHover(null)
+  }
+
+  function cancelPendingSwap() {
+    setPendingSwap(null)
   }
 
   function toggleExpanded(id: string) {
@@ -606,6 +646,14 @@ export default function Planner() {
       />
 
       <PlanDragCoach open={showDragCoach} onClose={closeDragCoach} />
+
+      <SwapConfirmDialog
+        pending={pendingSwap}
+        sems={plan.sems}
+        curriculum={state.curriculum}
+        onConfirm={confirmPendingSwap}
+        onCancel={cancelPendingSwap}
+      />
 
       <main className="main">
         {state.step === 1 && (
@@ -1441,7 +1489,17 @@ export default function Planner() {
               </div>
             )}
 
-            {dropHint && (
+            {swapHover && (
+              <div className="alert alert-ok plan-swap-hint">
+                <span className="alert-icon">⇄</span>
+                <div>
+                  <strong>Release to swap</strong> {swapHover.draggedCode} with{' '}
+                  {swapHover.targetCode} ({swapHover.targetSemLabel})
+                </div>
+              </div>
+            )}
+
+            {dropHint && !swapHover && (
               <div className="alert alert-warn">
                 <span className="alert-icon">⚠</span>
                 <div>{dropHint}</div>
@@ -1695,8 +1753,28 @@ export default function Planner() {
               if (!semPlan || semPlan.courses.length === 0) return null
               const borderClass = `${seasonKey(sem.season)}-border`
               const pillClass = seasonKey(sem.season)
-              const isValidDrop = drag && validDropSems.has(sem.code)
-              const isInvalidDrop = drag && !validDropSems.has(sem.code) && drag.fromSem !== sem.code
+              const canMoveHere = !!(drag && validMoveSems.has(sem.code))
+              const canSwapHere =
+                !!(drag && validDropSems.has(sem.code) && !validMoveSems.has(sem.code))
+              const isSwapOnly = canSwapHere
+              const isMoveHere = canMoveHere && drag?.fromSem !== sem.code
+              const isInvalidDrop =
+                drag && !validDropSems.has(sem.code) && drag.fromSem !== sem.code
+              const draggedCourse = drag
+                ? resolveCourse(drag.courseId, state.curriculum)
+                : undefined
+              const layout = state.planLayout ?? planToLayout(basePlan)
+              const swapPartners =
+                drag && draggedCourse && isSwapOnly
+                  ? swapPartnersInSemester(
+                      draggedCourse,
+                      drag.fromSem,
+                      sem.code,
+                      plan.sems,
+                      layout,
+                      planner,
+                    )
+                  : []
               return (
                 <div key={sem.code} className="sem-block">
                   <div className="sem-hdr">
@@ -1705,16 +1783,23 @@ export default function Planner() {
                       {semPlan.cr} credit{semPlan.cr !== 1 ? 's' : ''}
                     </span>
                   </div>
+                  {isSwapOnly && swapPartners.length > 0 && (
+                    <p className="sem-swap-note">
+                      Full — drop onto {swapPartners.map((p) => p.code).join(' or ')} to swap
+                    </p>
+                  )}
                   <div
-                    className={`sem-body ${borderClass} ${isValidDrop ? 'sem-drop-valid' : ''} ${isInvalidDrop ? 'sem-drop-invalid' : ''}`}
+                    className={`sem-body ${borderClass} ${isMoveHere ? 'sem-drop-valid' : ''} ${isSwapOnly ? 'sem-drop-swap' : ''} ${isInvalidDrop ? 'sem-drop-invalid' : ''}`}
                     onDragOver={(e) => {
                       if (!drag) return
+                      if (!isMoveHere && !isSwapOnly) return
                       e.preventDefault()
-                      e.dataTransfer.dropEffect = isValidDrop ? 'move' : 'none'
+                      e.dataTransfer.dropEffect = isMoveHere ? 'move' : 'copy'
                     }}
                     onDrop={(e) => {
                       e.preventDefault()
-                      if (isValidDrop) handlePlanDrop(sem.code)
+                      if (isMoveHere) handlePlanDrop(sem.code)
+                      else if (isSwapOnly) handlePlanDrop(sem.code)
                     }}
                   >
                     {semPlan.courses.map((course) => {
@@ -1723,6 +1808,9 @@ export default function Planner() {
                         !!drag &&
                         drag.fromSem !== sem.code &&
                         validSwapKeys.has(swapKey)
+                      const draggedCode = drag
+                        ? resolveCourse(drag.courseId, state.curriculum)?.code
+                        : undefined
                       return (
                       <PlanCard
                         key={course.id}
@@ -1733,25 +1821,42 @@ export default function Planner() {
                         isDragging={drag?.courseId === course.id}
                         coachPulse={pulsePlanCards}
                         swapTarget={canSwap}
+                        swapLabel={canSwap ? 'Swap' : undefined}
                         onDragStart={() => {
                           setDropHint('')
+                          setSwapHover(null)
                           setDrag({ courseId: course.id, fromSem: sem.code })
                         }}
                         onDragEnd={() => {
                           setDrag(null)
                           setDropHint('')
+                          setSwapHover(null)
+                        }}
+                        onDragEnter={() => {
+                          if (!canSwap || !draggedCode) return
+                          setSwapHover({
+                            draggedCode,
+                            targetCode: course.code,
+                            targetSemLabel: sem.label,
+                          })
+                          setDropHint('')
+                        }}
+                        onDragLeave={() => {
+                          setSwapHover((prev) =>
+                            prev?.targetCode === course.code ? null : prev,
+                          )
                         }}
                         onDragOver={(e) => {
                           if (!drag || drag.fromSem === sem.code) return
                           if (!canSwap) return
                           e.preventDefault()
                           e.stopPropagation()
-                          e.dataTransfer.dropEffect = 'move'
+                          e.dataTransfer.dropEffect = 'copy'
                         }}
                         onDrop={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
-                          if (canSwap) handlePlanSwap(course.id, sem.code)
+                          if (canSwap) requestPlanSwap(course.id, sem.code)
                         }}
                       />
                     )})}
