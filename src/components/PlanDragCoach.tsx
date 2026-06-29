@@ -148,11 +148,11 @@ export default function PlanDragCoach({ open, onClose }: PlanDragCoachProps) {
   return (
     <dialog
       ref={dialogRef}
-      className="drag-coach-dialog"
+      className="app-dialog drag-coach-dialog"
       onClose={finish}
       aria-labelledby="drag-coach-title"
     >
-      <div className="drag-coach-modal">
+      <div className="app-dialog-inner drag-coach-modal">
         <div className="req-hdr">
           <div>
             <h2 id="drag-coach-title" className="req-title">

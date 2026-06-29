@@ -79,7 +79,8 @@ export function FeatureRequestModal({ open, onClose }: FeatureRequestModalProps)
   }
 
   return (
-    <dialog ref={dialogRef} className="req-dialog" onClose={handleClose}>
+    <dialog ref={dialogRef} className="app-dialog req-dialog" onClose={handleClose}>
+      <div className="app-dialog-inner">
       <form className="req-modal" onSubmit={handleSubmit}>
         <div className="req-hdr">
           <div>
@@ -159,14 +160,29 @@ export function FeatureRequestModal({ open, onClose }: FeatureRequestModalProps)
 
             <div className="fg">
               <label htmlFor="reqFiles">Attachments</label>
-              <input
-                ref={fileInputRef}
-                id="reqFiles"
-                type="file"
-                multiple
-                accept=".xlsx,.xls,.pdf,.png,.jpg,.jpeg,.doc,.docx,.txt,.csv"
-                onChange={handleFileChange}
-              />
+              <div className="req-file-row">
+                <input
+                  ref={fileInputRef}
+                  id="reqFiles"
+                  type="file"
+                  multiple
+                  className="file-input-hidden"
+                  accept=".xlsx,.xls,.pdf,.png,.jpg,.jpeg,.doc,.docx,.txt,.csv"
+                  onChange={handleFileChange}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary req-file-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Choose files
+                </button>
+                <span className="req-file-status">
+                  {files.length === 0
+                    ? 'No files selected'
+                    : `${files.length} file${files.length === 1 ? '' : 's'} selected`}
+                </span>
+              </div>
               <span className="hint">
                 Up to 5 files, 4 MB total (.xlsx, .pdf, images, etc.)
               </span>
@@ -220,6 +236,7 @@ export function FeatureRequestModal({ open, onClose }: FeatureRequestModalProps)
           </>
         )}
       </form>
+      </div>
     </dialog>
   )
 }
