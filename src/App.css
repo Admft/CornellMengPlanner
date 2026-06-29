@@ -1487,10 +1487,28 @@ select:focus {
   margin-bottom: 8px;
 }
 
+.plan-swap-hint {
+  border-color: #b8dfc0;
+  background: #edf7ef;
+}
+
+.plan-drag-feedback {
+  position: sticky;
+  top: 72px;
+  z-index: 5;
+  margin-bottom: 16px;
+}
+
+.plan-drag-feedback .alert {
+  margin-bottom: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
 .sem-body {
   border-left: 3px solid var(--border);
   padding-left: 16px;
   margin-left: 6px;
+  min-height: 8px;
 }
 
 .sem-body.fall-border {
@@ -1681,12 +1699,14 @@ select:focus {
   outline-offset: 1px;
   background: var(--red-tint);
   position: relative;
+  overflow: visible;
+  z-index: 1;
 }
 
 .pc-swap-badge {
   position: absolute;
-  top: -10px;
-  right: 10px;
+  top: 6px;
+  right: 8px;
   z-index: 2;
   font-size: 10px;
   font-weight: 700;
@@ -1697,6 +1717,7 @@ select:focus {
   padding: 2px 8px;
   border-radius: 999px;
   pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .pc-drag {
@@ -1728,11 +1749,6 @@ select:focus {
   font-size: 12px;
   font-weight: 600;
   color: #9a5b00;
-}
-
-.plan-swap-hint {
-  border-color: #b8dfc0;
-  background: #edf7ef;
 }
 
 .swap-confirm-dialog {

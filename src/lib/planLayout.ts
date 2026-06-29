@@ -109,7 +109,9 @@ function canPlaceInLayout(
 
   const limit = semLimit(targetSem.season, state.crLimit)
   const load = semesterCredits(targetSem.code, layout, state.curriculum)
-  if (load + course.credits > limit + 0.001) {
+  const alreadyInSem = (layout[targetSem.code] ?? []).includes(course.id)
+  const projectedLoad = alreadyInSem ? load : load + course.credits
+  if (projectedLoad > limit + 0.001) {
     return {
       ok: false,
       reason: `${targetSem.label} is capped at ${limit} credits.`,
