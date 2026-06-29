@@ -1499,9 +1499,164 @@ select:focus {
   margin-bottom: 16px;
 }
 
+.plan-drag-feedback-floating {
+  position: fixed;
+  top: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 32px));
+  margin-bottom: 0;
+  pointer-events: none;
+}
+
 .plan-drag-feedback .alert {
   margin-bottom: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.plan-insert-hint {
+  border-color: #e8b4b4;
+  background: #fff5f5;
+}
+
+.plan-insert-slot {
+  border-radius: 6px;
+  transition:
+    min-height 0.15s ease,
+    margin 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.plan-insert-slot-idle {
+  min-height: 2px;
+  margin: 0;
+}
+
+.plan-insert-slot-visible {
+  min-height: 28px;
+  margin: 4px 0 6px;
+  border: 2px dashed #e0b4b4;
+  background: #fff8f8;
+  cursor: copy;
+}
+
+.plan-insert-slot-active {
+  min-height: 44px;
+  margin: 6px 0 8px;
+  border-color: var(--red);
+  background: var(--red-tint);
+  box-shadow: 0 0 0 2px rgba(179, 27, 27, 0.12);
+}
+
+.plan-insert-slot-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  min-height: inherit;
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.plan-insert-slot-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.plan-drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #fff;
+  border: 2px solid var(--red);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.plan-drag-ghost-code {
+  color: var(--text);
+}
+
+.plan-drag-ghost-cr {
+  color: var(--text3);
+  font-size: 12px;
+}
+
+body.plan-is-dragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+body.plan-is-dragging .pc-draggable {
+  cursor: grabbing;
+}
+
+.sem-body-drag {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.pc-swap-hover {
+  transform: scale(1.03);
+  z-index: 2;
+  outline: 3px solid var(--red);
+  outline-offset: 2px;
+  background: var(--red-tint);
+  box-shadow: 0 6px 20px rgba(179, 27, 27, 0.15);
+}
+
+.pc-swap-invalid {
+  transform: scale(1.02);
+  outline-color: #c6760a;
+  background: #fff8ed;
+}
+
+.pc-swap-badge-warn {
+  background: #c6760a;
+  max-width: 70%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pc {
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    outline 0.12s ease;
+}
+
+.pc-drag {
+  color: var(--text3);
+  font-size: 14px;
+  margin-right: 4px;
+  flex-shrink: 0;
+  user-select: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.pc-drag:active {
+  cursor: grabbing;
 }
 
 .sem-body {
@@ -1684,9 +1839,11 @@ select:focus {
 
 .pc-draggable .pc-hdr {
   cursor: grab;
+  touch-action: none;
 }
 
-.pc-draggable:active .pc-hdr {
+.pc-draggable:active .pc-hdr,
+body.plan-is-dragging .pc-draggable .pc-hdr {
   cursor: grabbing;
 }
 
@@ -1707,6 +1864,7 @@ select:focus {
   position: absolute;
   top: 6px;
   right: 8px;
+  left: 8px;
   z-index: 2;
   font-size: 10px;
   font-weight: 700;
@@ -1714,18 +1872,11 @@ select:focus {
   letter-spacing: 0.05em;
   color: #fff;
   background: var(--red);
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: 4px 8px;
+  border-radius: 6px;
   pointer-events: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
-.pc-drag {
-  color: var(--text3);
-  font-size: 14px;
-  margin-right: 4px;
-  flex-shrink: 0;
-  user-select: none;
+  text-align: center;
 }
 
 .sem-body.sem-drop-valid {

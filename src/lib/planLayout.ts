@@ -197,6 +197,7 @@ export function moveCourseInLayout(
   courseId: string,
   fromSemCode: string,
   toSemCode: string,
+  toIndex?: number,
 ): Record<string, string[]> {
   if (fromSemCode === toSemCode) return layout
   const next: Record<string, string[]> = {}
@@ -204,7 +205,13 @@ export function moveCourseInLayout(
     next[code] = [...ids]
   }
   next[fromSemCode] = (next[fromSemCode] ?? []).filter((id) => id !== courseId)
-  next[toSemCode] = [...(next[toSemCode] ?? []), courseId]
+  const target = [...(next[toSemCode] ?? [])]
+  if (toIndex !== undefined && toIndex >= 0 && toIndex <= target.length) {
+    target.splice(toIndex, 0, courseId)
+  } else {
+    target.push(courseId)
+  }
+  next[toSemCode] = target
   return next
 }
 

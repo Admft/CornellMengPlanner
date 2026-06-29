@@ -1,5 +1,5 @@
-import type { DragEvent } from 'react'
 import type { Course, Semester } from '../types'
+import type { MutableRefObject } from 'react'
 
 interface CourseListItemProps {
   course: Course
@@ -95,36 +95,60 @@ export function CourseListItem({
 
 interface PlanCardProps {
   course: Course
+  semCode?: string
   expanded: boolean
   onToggle: () => void
-  draggable?: boolean
-  onDragStart?: () => void
-  onDragEnd?: () => void
-  onDragOver?: (e: DragEvent) => void
-  onDrop?: (e: DragEvent) => void
+  onDragPointerDown?: (e: React.PointerEvent) => void
+  skipToggleRef?: MutableRefObject<boolean>
   isDragging?: boolean
-  swapTarget?: boolean
   coachPulse?: boolean
-  swapLabel?: string
-  onDragEnter?: () => void
-  onDragLeave?: () => void
+  swapHover?: boolean
+  swapInvalid?: boolean
+  swapHint?: string
+}
+
+export function PlanInsertSlot({
+  semCode,
+  index,
+  visible,
+  active,
+}: {
+  semCode: string
+  index: number
+  visible: boolean
+  active: boolean
+}) {
+  if (!visible) {
+    return <div className="plan-insert-slot plan-insert-slot-idle" aria-hidden />
+  }
+
+  return (
+    <div
+      className={`plan-insert-slot plan-insert-slot-visible ${active ? 'plan-insert-slot-active' : ''}`}
+      data-insert-sem={semCode}
+      data-insert-index={index}
+      role="presentation"
+    >
+      <div className="plan-insert-slot-inner">
+        <span className="plan-insert-slot-icon">+</span>
+        <span className="plan-insert-slot-label">Add here</span>
+      </div>
+    </div>
+  )
 }
 
 export function PlanCard({
   course,
+  semCode,
   expanded,
   onToggle,
-  draggable = false,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDrop,
+  onDragPointerDown,
+  skipToggleRef,
   isDragging = false,
-  swapTarget = false,
   coachPulse = false,
-  swapLabel,
-  onDragEnter,
-  onDragLeave,
+  swapHover = false,
+  swapInvalid = false,
+  swapHint,
 }: PlanCardProps) {
   const catClass =
     course.cat === 'req' || course.cat === 'cap'
@@ -157,26 +181,31 @@ export function PlanCard({
 
   return (
     <div
-      className={`pc ${catClass} ${expanded ? 'xpd' : ''} ${isDragging ? 'pc-dragging' : ''} ${draggable ? 'pc-draggable' : ''} ${swapTarget ? 'pc-swap-target' : ''} ${coachPulse && draggable ? 'pc-coach-pulse' : ''}`}
-      draggable={draggable}
-      onDragStart={(e) => {
-        if (!draggable) return
-        e.dataTransfer.setData('text/plain', course.id)
-        e.dataTransfer.effectAllowed = 'move'
-        onDragStart?.()
-      }}
-      onDragEnd={() => onDragEnd?.()}
-      onDragEnter={() => onDragEnter?.()}
-      onDragLeave={() => onDragLeave?.()}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      className={`pc ${catClass} ${expanded ? 'xpd' : ''} ${isDragging ? 'pc-dragging' : ''} ${onDragPointerDown ? 'pc-draggable' : ''} ${swapHover ? (swapInvalid ? 'pc-swap-invalid' : 'pc-swap-hover') : ''} ${coachPulse && onDragPointerDown ? 'pc-coach-pulse' : ''}`}
+      data-swap-course={semCode ? course.id : undefined}
+      data-swap-sem={semCode}
     >
-      {swapLabel && <span className="pc-swap-badge">{swapLabel}</span>}
+      {swapHint && (
+        <span className={`pc-swap-badge ${swapInvalid ? 'pc-swap-badge-warn' : ''}`}>
+          {swapHint}
+        </span>
+      )}
       <div
         className="pc-hdr"
-        onClick={onToggle}
+        onPointerDown={onDragPointerDown}
+        onClick={() => {
+          if (skipToggleRef?.current) {
+            skipToggleRef.current = false
+            return
+          }
+          onToggle()
+        }}
       >
-        {draggable && <span className="pc-drag" title="Drag to move">⠿</span>}
+        {onDragPointerDown && (
+          <span className="pc-drag" title="Drag to move or swap" aria-hidden>
+            ⠿
+          </span>
+        )}
         <span className="pc-code">{course.code}</span>
         <span className="pc-name">{course.name}</span>
         <span className={`pc-tag ${tagClass}`}>{tagLabel}</span>
