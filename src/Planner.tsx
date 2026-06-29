@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom'
 import { CourseListItem, PlanCard } from './components/CourseItems'
 import { FeatureRequestModal } from './components/FeatureRequestModal'
 import SiteFooter from './components/SiteFooter'
+import PlanDragCoach from './components/PlanDragCoach'
+import WhatsNewBanner from './components/WhatsNewBanner'
+import { hasSeenDragCoach } from './lib/dragCoach'
 import {
   DEFAULT_CURRICULUM,
   analyticsRequirementMet,
@@ -178,6 +181,8 @@ export default function Planner() {
   const [importError, setImportError] = useState('')
   const [importing, setImporting] = useState(false)
   const [showFeatureRequest, setShowFeatureRequest] = useState(false)
+  const [showDragCoach, setShowDragCoach] = useState(false)
+  const [pulsePlanCards, setPulsePlanCards] = useState(false)
   const [customDraft, setCustomDraft] = useState({
     code: '',
     name: '',
@@ -200,6 +205,18 @@ export default function Planner() {
     setDefaultPageMeta()
     void recordPlannerVisit()
   }, [])
+
+  useEffect(() => {
+    if (state.step === 4 && !hasSeenDragCoach()) {
+      setShowDragCoach(true)
+    }
+  }, [state.step])
+
+  function closeDragCoach() {
+    setShowDragCoach(false)
+    setPulsePlanCards(true)
+    window.setTimeout(() => setPulsePlanCards(false), 5000)
+  }
 
   const planner = useMemo(() => toPlannerState(state), [state])
   const basePlan = useMemo(() => generatePlan(planner), [planner])
@@ -543,6 +560,9 @@ export default function Planner() {
             <span className="hdr-app hdr-app-short">· MEM Course Planner</span>
           </div>
           <div className="hdr-actions">
+            <Link to="/changelog" className="hdr-link">
+              Changelog
+            </Link>
             <Link to="/stats" className="hdr-link">
               Stats
             </Link>
@@ -556,6 +576,8 @@ export default function Planner() {
             </button>
           </div>
         </header>
+
+        <WhatsNewBanner />
 
         <nav className="pnav">
           {STEPS.map((step, index) => {
@@ -582,6 +604,8 @@ export default function Planner() {
         open={showFeatureRequest}
         onClose={() => setShowFeatureRequest(false)}
       />
+
+      <PlanDragCoach open={showDragCoach} onClose={closeDragCoach} />
 
       <main className="main">
         {state.step === 1 && (
@@ -1368,6 +1392,13 @@ export default function Planner() {
             <div className="plan-header-row">
               <h1 className="step-title">Your personalized course plan</h1>
               <div className="plan-actions">
+                <button
+                  type="button"
+                  className="btn-sm"
+                  onClick={() => setShowDragCoach(true)}
+                >
+                  ⠿ Drag tips
+                </button>
                 <button className="btn-sm" onClick={() => window.print()}>
                   ⎙ Print
                 </button>
@@ -1700,6 +1731,7 @@ export default function Planner() {
                         onToggle={() => togglePlanExpanded(`${sem.code}-${course.id}`)}
                         draggable
                         isDragging={drag?.courseId === course.id}
+                        coachPulse={pulsePlanCards}
                         swapTarget={canSwap}
                         onDragStart={() => {
                           setDropHint('')

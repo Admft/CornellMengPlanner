@@ -104,6 +104,7 @@ interface PlanCardProps {
   onDrop?: (e: DragEvent) => void
   isDragging?: boolean
   swapTarget?: boolean
+  coachPulse?: boolean
 }
 
 export function PlanCard({
@@ -117,6 +118,7 @@ export function PlanCard({
   onDrop,
   isDragging = false,
   swapTarget = false,
+  coachPulse = false,
 }: PlanCardProps) {
   const catClass =
     course.cat === 'req' || course.cat === 'cap'
@@ -149,7 +151,7 @@ export function PlanCard({
 
   return (
     <div
-      className={`pc ${catClass} ${expanded ? 'xpd' : ''} ${isDragging ? 'pc-dragging' : ''} ${draggable ? 'pc-draggable' : ''} ${swapTarget ? 'pc-swap-target' : ''}`}
+      className={`pc ${catClass} ${expanded ? 'xpd' : ''} ${isDragging ? 'pc-dragging' : ''} ${draggable ? 'pc-draggable' : ''} ${swapTarget ? 'pc-swap-target' : ''} ${coachPulse && draggable ? 'pc-coach-pulse' : ''}`}
       draggable={draggable}
       onDragStart={(e) => {
         if (!draggable) return
