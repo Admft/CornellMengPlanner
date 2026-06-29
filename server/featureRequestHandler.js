@@ -8,11 +8,33 @@ import {
   smtpAuthHint,
 } from './featureRequestCore.js'
 
+import {
+  checkRateLimit,
+  clientIp,
+  FEATURE_REQUEST_LIMIT,
+} from './rateLimit.js'
+
 async function handleFeatureRequest(req, res) {
   if (req.method !== 'POST') {
     res.statusCode = 405
     res.setHeader('Content-Type', 'application/json')
     res.end(JSON.stringify({ ok: false, error: 'Method not allowed' }))
+    return
+  }
+
+  const rateKey = `feature-request:${clientIp(req)}`
+  const { allowed, retryAfterMs } = checkRateLimit(rateKey, FEATURE_REQUEST_LIMIT)
+  if (!allowed) {
+    const retryAfterSec = Math.max(1, Math.ceil(retryAfterMs / 1000))
+    res.statusCode = 429
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Retry-After', String(retryAfterSec))
+    res.end(
+      JSON.stringify({
+        ok: false,
+        error: `Too many requests. Try again in ${retryAfterSec} seconds.`,
+      }),
+    )
     return
   }
 

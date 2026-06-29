@@ -4,6 +4,7 @@ import {
   devicePercent,
   detectDevice,
   fetchSiteStats,
+  statsRefreshCooldownRemaining,
   type DeviceType,
   type SiteStats,
 } from '../lib/analytics'
@@ -71,11 +72,19 @@ export default function StatsPage() {
   const [thisDevice] = useState(() => detectDevice())
   const loadedRef = useRef(false)
 
-  async function loadStats() {
+  async function loadStats(options?: { initial?: boolean }) {
+    if (!options?.initial) {
+      const remaining = statsRefreshCooldownRemaining()
+      if (remaining > 0) {
+        setError(`Please wait ${Math.ceil(remaining / 1000)}s before refreshing again.`)
+        return
+      }
+    }
+
     setLoading(true)
     setError('')
     try {
-      const data = await fetchSiteStats()
+      const data = await fetchSiteStats({ skipRefreshLimit: options?.initial })
       setStats(data)
       if (
         data.dailyVisitors == null &&
@@ -104,7 +113,7 @@ export default function StatsPage() {
   useEffect(() => {
     if (loadedRef.current) return
     loadedRef.current = true
-    void loadStats()
+    void loadStats({ initial: true })
   }, [])
 
   const deviceTotal = stats?.deviceTotal ?? 0

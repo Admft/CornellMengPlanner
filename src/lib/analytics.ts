@@ -18,6 +18,16 @@ export const COUNTERS = {
 
 export type DeviceType = 'mobile' | 'tablet' | 'desktop'
 
+export interface SiteStats {
+  dailyVisitors: number | null
+  mobile: number | null
+  tablet: number | null
+  desktop: number | null
+  excelExports: number | null
+  deviceTotal: number
+  lastFetched: Date
+}
+
 const DEVICE_COUNTER: Record<DeviceType, string> = {
   mobile: COUNTERS.mobile,
   tablet: COUNTERS.tablet,
@@ -26,6 +36,23 @@ const DEVICE_COUNTER: Record<DeviceType, string> = {
 
 const DAILY_VISIT_PREFIX = 'mem-planner-counted'
 const API_TIMEOUT_MS = 8000
+
+/** Minimum values shown on /stats — live counts never display below these. */
+export const STATS_FLOORS = {
+  dailyVisitors: 84,
+  excelExports: 4,
+  desktop: 59,
+  mobile: 25,
+  tablet: 0,
+} as const
+
+const HIT_COOLDOWN_MS = 2000
+const EXPORT_HIT_COOLDOWN_MS = 30_000
+const STATS_REFRESH_COOLDOWN_MS = 5000
+
+let lastGlobalHitAt = 0
+let lastExportHitAt = 0
+let lastStatsFetchAt = 0
 
 function todayKey(): string {
   const d = new Date()
@@ -61,6 +88,32 @@ function parseValue(data: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null
   }
   return null
+}
+
+function hitCooldownRemaining(lastAt: number, cooldownMs: number): number {
+  const elapsed = Date.now() - lastAt
+  return elapsed >= cooldownMs ? 0 : cooldownMs - elapsed
+}
+
+/** Milliseconds until another manual stats refresh is allowed (0 = ready). */
+export function statsRefreshCooldownRemaining(): number {
+  return hitCooldownRemaining(lastStatsFetchAt, STATS_REFRESH_COOLDOWN_MS)
+}
+
+function canRecordHit(now: number, lastAt: number, cooldownMs: number): boolean {
+  return now - lastAt >= cooldownMs
+}
+
+function applyStatsFloors(
+  raw: Omit<SiteStats, 'deviceTotal' | 'lastFetched'>,
+): Omit<SiteStats, 'deviceTotal' | 'lastFetched'> {
+  return {
+    dailyVisitors: Math.max(STATS_FLOORS.dailyVisitors, raw.dailyVisitors ?? 0),
+    excelExports: Math.max(STATS_FLOORS.excelExports, raw.excelExports ?? 0),
+    desktop: Math.max(STATS_FLOORS.desktop, raw.desktop ?? 0),
+    mobile: Math.max(STATS_FLOORS.mobile, raw.mobile ?? 0),
+    tablet: Math.max(STATS_FLOORS.tablet, raw.tablet ?? 0),
+  }
 }
 
 async function fetchCount(action: 'hit' | 'get', key: string): Promise<number | null> {
@@ -99,6 +152,10 @@ export function detectDevice(): DeviceType {
 export async function recordPlannerVisit(): Promise<void> {
   if (!markOnceToday('visit')) return
 
+  const now = Date.now()
+  if (!canRecordHit(now, lastGlobalHitAt, HIT_COOLDOWN_MS)) return
+  lastGlobalHitAt = now
+
   const device = detectDevice()
   await Promise.all([
     fetchCount('hit', COUNTERS.dailyVisitors),
@@ -106,22 +163,34 @@ export async function recordPlannerVisit(): Promise<void> {
   ])
 }
 
-/** Every Excel export increments — intentional raw count. */
+/** Every Excel export increments — rate-limited to reduce counter spam. */
 export async function recordExcelExport(): Promise<void> {
+  const now = Date.now()
+  if (!canRecordHit(now, lastExportHitAt, EXPORT_HIT_COOLDOWN_MS)) return
+  if (!canRecordHit(now, lastGlobalHitAt, HIT_COOLDOWN_MS)) return
+  lastExportHitAt = now
+  lastGlobalHitAt = now
   await fetchCount('hit', COUNTERS.excelExports)
 }
 
-export interface SiteStats {
-  dailyVisitors: number | null
-  mobile: number | null
-  tablet: number | null
-  desktop: number | null
-  excelExports: number | null
-  deviceTotal: number
-  lastFetched: Date
+/** Milliseconds until another export will be counted (0 = ready). */
+export function excelExportCooldownRemaining(): number {
+  return Math.max(
+    hitCooldownRemaining(lastExportHitAt, EXPORT_HIT_COOLDOWN_MS),
+    hitCooldownRemaining(lastGlobalHitAt, HIT_COOLDOWN_MS),
+  )
 }
 
-export async function fetchSiteStats(): Promise<SiteStats> {
+export async function fetchSiteStats(options?: { skipRefreshLimit?: boolean }): Promise<SiteStats> {
+  if (!options?.skipRefreshLimit) {
+    const remaining = statsRefreshCooldownRemaining()
+    if (remaining > 0) {
+      throw new Error(`Please wait ${Math.ceil(remaining / 1000)}s before refreshing again.`)
+    }
+  }
+
+  lastStatsFetchAt = Date.now()
+
   const [dailyVisitors, mobile, tablet, desktop, excelExports] = await Promise.all([
     fetchCount('get', COUNTERS.dailyVisitors),
     fetchCount('get', COUNTERS.mobile),
@@ -130,14 +199,12 @@ export async function fetchSiteStats(): Promise<SiteStats> {
     fetchCount('get', COUNTERS.excelExports),
   ])
 
-  const deviceTotal = (mobile ?? 0) + (tablet ?? 0) + (desktop ?? 0)
+  const floored = applyStatsFloors({ dailyVisitors, mobile, tablet, desktop, excelExports })
+  const deviceTotal =
+    (floored.mobile ?? 0) + (floored.tablet ?? 0) + (floored.desktop ?? 0)
 
   return {
-    dailyVisitors,
-    mobile,
-    tablet,
-    desktop,
-    excelExports,
+    ...floored,
     deviceTotal,
     lastFetched: new Date(),
   }
