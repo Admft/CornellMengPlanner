@@ -46,3 +46,15 @@ export const FEATURE_REQUEST_LIMIT = {
   windowMs: 15 * 60 * 1000,
   max: 5,
 }
+
+/** Reading the public stats page JSON. */
+export const STATS_READ_LIMIT = {
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+}
+
+/** Visit / export beacons — backup IP cap if cookies are cleared. */
+export const ANALYTICS_EVENT_LIMIT = {
+  windowMs: 60 * 60 * 1000,
+  max: 12,
+}

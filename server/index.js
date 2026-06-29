@@ -4,6 +4,7 @@ import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { mountFeatureRequestRoute } from './featureRequestHandler.js'
+import { mountAnalyticsRoutes } from './analyticsHandler.js'
 
 dotenv.config()
 
@@ -13,6 +14,7 @@ const PORT = process.env.PORT || 3001
 
 app.use(cors({ origin: true }))
 mountFeatureRequestRoute(app)
+mountAnalyticsRoutes(app)
 
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, '../dist')

@@ -84,7 +84,10 @@ export default function StatsPage() {
     setLoading(true)
     setError('')
     try {
-      const data = await fetchSiteStats({ skipRefreshLimit: options?.initial })
+      const data = await fetchSiteStats({
+        skipRefreshLimit: options?.initial,
+        force: !options?.initial,
+      })
       setStats(data)
       if (
         data.dailyVisitors == null &&
@@ -95,8 +98,12 @@ export default function StatsPage() {
           'Stats service is unreachable right now. Try refreshing in a moment.',
         )
       }
-    } catch {
-      setError('Could not load stats right now. Try refreshing.')
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Could not load stats right now. Try refreshing.',
+      )
     } finally {
       setLoading(false)
     }
@@ -143,9 +150,8 @@ export default function StatsPage() {
           <div>
             <h1 className="step-title">Planner usage</h1>
             <p className="step-sub">
-              Approximate unique reach — one count per browser per day (resets at
-              midnight). Excel exports count every download. No accounts or cookies
-              beyond local deduping.
+              Approximate unique reach — one count per browser per day. Stats are
+              served from a cached snapshot; use Refresh for the latest numbers.
             </p>
           </div>
           <button
