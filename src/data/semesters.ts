@@ -107,7 +107,9 @@ export function autoPlaceSemesters(programStart: string, planFrom: string): Seme
   return SEMS.slice(startIdx, planIdx + 1)
 }
 
-/** Semester columns on the official proposal spreadsheet (E–P). */
+/** Cornell template row 12 labels: E=SU1, F=FA1, G=SP1, H=SU2, … */
+const TEMPLATE_SEASON_ORDER: Semester['season'][] = ['Summer', 'Fall', 'Spring']
+
 export function excelSemesters(
   programStart: string,
   planFrom: string,
@@ -115,8 +117,22 @@ export function excelSemesters(
   maxCols = 12,
 ): Semester[] {
   const start = programStart.trim() || planFrom
-  const range = semRange(start, grad)
-  return range.slice(0, maxCols)
+  const startIdx = semIdx(start)
+  const gradIdx = semIdx(grad)
+  if (startIdx < 0 || gradIdx < 0) return []
+
+  const startSeasonIdx = TEMPLATE_SEASON_ORDER.indexOf(SEMS[startIdx].season)
+  if (startSeasonIdx < 0) return []
+
+  const result: Semester[] = []
+  for (let t = 0; t < maxCols; t++) {
+    const calIdx = startIdx + (t - startSeasonIdx)
+    if (calIdx < 0 || calIdx >= SEMS.length) break
+    const sem = SEMS[calIdx]
+    if (semIdx(sem.code) > gradIdx) break
+    result.push(sem)
+  }
+  return result
 }
 
 export function graduationSemesters(planFromCode: string): Semester[] {

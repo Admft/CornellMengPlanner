@@ -19,6 +19,18 @@ export interface CoursePlacement {
 
 const MIN_ELECTIVES = 2
 
+/** Plan from the earlier of program start and “next semester” so SP1 courses aren’t skipped. */
+function planningStartSemester(state: PlannerState): string {
+  const programStart = state.programStartSem.trim()
+  if (!programStart) return state.planFromSem
+
+  const programIdx = semIdx(programStart)
+  const fromIdx = semIdx(state.planFromSem)
+  if (programIdx < 0) return state.planFromSem
+  if (fromIdx < 0) return programStart
+  return programIdx < fromIdx ? programStart : state.planFromSem
+}
+
 function allKnownCourses(catalog: CurriculumCatalog): Course[] {
   return [...catalogToList(catalog), ...LEGACY_COURSES]
 }
@@ -152,7 +164,8 @@ export function getSkippedElectives(state: PlannerState): Course[] {
 }
 
 export function generatePlan(state: PlannerState): GeneratedPlan {
-  const sems = semRange(state.planFromSem, state.gradSem)
+  const planStartSem = planningStartSemester(state)
+  const sems = semRange(planStartSem, state.gradSem)
   const done = new Set(state.taken)
   const ctx = completionCtx(state)
   let queue = buildQueue(state)
