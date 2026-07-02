@@ -12,13 +12,40 @@ export interface ChangelogRelease {
 }
 
 /** Bump this date when you ship user-visible changes; drives the “what’s new” banner. */
-export const LATEST_VERSION = '2026-06-29'
+export const LATEST_VERSION = '2026-07-01'
 
 const SEEN_STORAGE_KEY = 'mem-planner-changelog-seen'
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
     version: LATEST_VERSION,
+    label: 'July 1, 2026',
+    summary:
+      'Plan starts when you say it does, and drag-and-drop on the schedule is rebuilt to be clearer and actually work.',
+    sections: [
+      {
+        title: 'Your plan',
+        items: [
+          'The plan now begins at your chosen “next semester” (e.g. Fall 2026) instead of defaulting back to program start.',
+          'Changing next semester clears a stale layout so Step 4 regenerates from the right term.',
+          'Mark completed courses in Step 2 so they show as done — not as empty future semesters.',
+        ],
+      },
+      {
+        title: 'Drag & drop',
+        items: [
+          'Rebuilt course dragging with pointer tracking — swaps and moves are much more reliable.',
+          'Drag from anywhere on the course row; a quick click still expands the card details.',
+          'One red “Add here” zone at the bottom of each valid semester to move a course in.',
+          'Drop onto another course to swap semesters — valid partners glow, and a summary bar lists every course you can swap with.',
+          'Course names stay readable while dragging; swap hints appear below the row, not over the title.',
+          'Swaps apply immediately when credits and prerequisites check out.',
+        ],
+      },
+    ],
+  },
+  {
+    version: '2026-06-29',
     label: 'June 29, 2026',
     summary:
       'More reliable Excel exports, course swapping on the plan, and stronger usage-stats protection.',
@@ -27,7 +54,6 @@ export const CHANGELOG: ChangelogRelease[] = [
         title: 'Excel export & scheduling',
         items: [
           'Fixed proposal columns to match Cornell’s template (Summer 1, Fall 1, Spring 1…) so credits land in the right semester.',
-          'Planner now includes your program-start spring when “next semester” is later — required courses like economics are less likely to be skipped.',
           'Smarter auto-scheduling packs smaller courses first when a semester is tight on credits.',
           'Export is blocked until the plan has at least 30 credits, no unscheduled courses, and every course can be placed on the spreadsheet.',
         ],
