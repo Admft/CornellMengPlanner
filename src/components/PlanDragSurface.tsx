@@ -101,6 +101,20 @@ export default function PlanDragSurface({
     return validSwapTargets(draggedCourse, drag.fromSem, plan.sems, layout, planner)
   }, [drag, draggedCourse, plan.sems, layout, planner])
 
+  const swapPartnerLabels = useMemo(() => {
+    if (!drag || validSwapKeys.size === 0) return []
+    const labels: { code: string; semLabel: string }[] = []
+    for (const sem of plan.sems) {
+      for (const id of layout[sem.code] ?? []) {
+        const key = `${sem.code}:${id}`
+        if (!validSwapKeys.has(key) || id === drag.courseId) continue
+        const course = resolveCourse(id, curriculum)
+        if (course) labels.push({ code: course.code, semLabel: sem.label })
+      }
+    }
+    return labels
+  }, [drag, validSwapKeys, plan.sems, layout, curriculum])
+
   const canSwapWith = useCallback(
     (targetCourseId: string, targetSemCode: string) => {
       if (!drag || !draggedCourse) return { ok: false as const, reason: '' }
@@ -318,6 +332,17 @@ export default function PlanDragSurface({
         </div>
       )}
 
+      {drag && draggedCourse && swapPartnerLabels.length > 0 && (
+        <div className="plan-swap-partners-bar">
+          <span className="plan-swap-partners-lbl">Can swap {draggedCourse.code} with</span>
+          <span className="plan-swap-partners-list">
+            {swapPartnerLabels
+              .map((p) => `${p.code} (${p.semLabel})`)
+              .join(', ')}
+          </span>
+        </div>
+      )}
+
       {hover?.kind === 'swap' && draggedCourse && (
         <div className="plan-drag-feedback plan-drag-feedback-floating">
           <div className="alert alert-ok plan-swap-hint">
@@ -382,14 +407,13 @@ export default function PlanDragSurface({
                     swapAvailable={swapAvailable}
                     swapHover={swapHover}
                     swapInvalid={swapInvalid}
-                    swapHint={
+                    showSwapChip={swapAvailable && !swapHover}
+                    swapStrip={
                       swapHover
                         ? swapCheck.ok
-                          ? `Swap with ${draggedCourse?.code ?? 'course'}`
+                          ? `Release to swap with ${draggedCourse?.code ?? 'course'}`
                           : swapCheck.reason || "Can't swap"
-                        : swapAvailable
-                          ? '⇄ Swap'
-                          : undefined
+                        : undefined
                     }
                     onDragPointerDown={(e) => prepareDrag(course.id, sem.code, e)}
                     skipToggleRef={skipToggleRef}

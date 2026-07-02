@@ -105,7 +105,8 @@ interface PlanCardProps {
   swapAvailable?: boolean
   swapHover?: boolean
   swapInvalid?: boolean
-  swapHint?: string
+  swapStrip?: string
+  showSwapChip?: boolean
 }
 
 export function PlanInsertSlot({
@@ -150,7 +151,8 @@ export function PlanCard({
   swapAvailable = false,
   swapHover = false,
   swapInvalid = false,
-  swapHint,
+  swapStrip,
+  showSwapChip = false,
 }: PlanCardProps) {
   const catClass =
     course.cat === 'req' || course.cat === 'cap'
@@ -187,11 +189,6 @@ export function PlanCard({
       data-swap-course={semCode ? course.id : undefined}
       data-swap-sem={semCode}
     >
-      {swapHint && (
-        <span className={`pc-swap-badge ${swapInvalid ? 'pc-swap-badge-warn' : ''}`}>
-          {swapHint}
-        </span>
-      )}
       <div
         className="pc-hdr"
         onPointerDown={onDragPointerDown}
@@ -212,8 +209,18 @@ export function PlanCard({
         <span className="pc-name">{course.name}</span>
         <span className={`pc-tag ${tagClass}`}>{tagLabel}</span>
         <span className="pc-cr">{course.credits} cr</span>
+        {showSwapChip && (
+          <span className="pc-swap-chip" title="Valid swap target">
+            ⇄
+          </span>
+        )}
         <span className="pc-chev">▼</span>
       </div>
+      {swapStrip && (
+        <div className={`pc-swap-strip ${swapInvalid ? 'pc-swap-strip-warn' : ''}`}>
+          {swapStrip}
+        </div>
+      )}
       <div className="pc-body">
         <p>{course.desc}</p>
         <p>{course.notes}</p>
