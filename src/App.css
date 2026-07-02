@@ -1615,6 +1615,35 @@ body.plan-is-dragging .pc-draggable {
   padding-bottom: 4px;
 }
 
+body.plan-is-dragging .pc-draggable:not(.pc-dragging):not(.pc-swap-available) {
+  opacity: 0.55;
+}
+
+.pc-swap-available {
+  outline: 2px solid rgba(179, 27, 27, 0.5);
+  outline-offset: 1px;
+  background: var(--red-tint);
+  box-shadow:
+    0 0 0 3px rgba(179, 27, 27, 0.1),
+    0 2px 14px rgba(179, 27, 27, 0.14);
+  animation: plan-swap-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes plan-swap-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(179, 27, 27, 0.1),
+      0 2px 14px rgba(179, 27, 27, 0.14);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(179, 27, 27, 0.18),
+      0 4px 20px rgba(179, 27, 27, 0.22);
+  }
+}
+
 .pc-swap-hover {
   transform: scale(1.03);
   z-index: 2;
@@ -1877,6 +1906,12 @@ body.plan-is-dragging .pc-draggable .pc-hdr {
   pointer-events: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   text-align: center;
+}
+
+.pc-swap-available .pc-swap-badge {
+  background: rgba(179, 27, 27, 0.88);
+  font-size: 9px;
+  padding: 3px 8px;
 }
 
 .sem-body.sem-drop-valid {

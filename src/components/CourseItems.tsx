@@ -102,6 +102,7 @@ interface PlanCardProps {
   skipToggleRef?: MutableRefObject<boolean>
   isDragging?: boolean
   coachPulse?: boolean
+  swapAvailable?: boolean
   swapHover?: boolean
   swapInvalid?: boolean
   swapHint?: string
@@ -146,6 +147,7 @@ export function PlanCard({
   skipToggleRef,
   isDragging = false,
   coachPulse = false,
+  swapAvailable = false,
   swapHover = false,
   swapInvalid = false,
   swapHint,
@@ -181,7 +183,7 @@ export function PlanCard({
 
   return (
     <div
-      className={`pc ${catClass} ${expanded ? 'xpd' : ''} ${isDragging ? 'pc-dragging' : ''} ${onDragPointerDown ? 'pc-draggable' : ''} ${swapHover ? (swapInvalid ? 'pc-swap-invalid' : 'pc-swap-hover') : ''} ${coachPulse && onDragPointerDown ? 'pc-coach-pulse' : ''}`}
+      className={`pc ${catClass} ${expanded ? 'xpd' : ''} ${isDragging ? 'pc-dragging' : ''} ${onDragPointerDown ? 'pc-draggable' : ''} ${swapHover ? (swapInvalid ? 'pc-swap-invalid' : 'pc-swap-hover') : swapAvailable ? 'pc-swap-available' : ''} ${coachPulse && onDragPointerDown ? 'pc-coach-pulse' : ''}`}
       data-swap-course={semCode ? course.id : undefined}
       data-swap-sem={semCode}
     >

@@ -7,6 +7,7 @@ import {
   moveCourseInLayout,
   swapCoursesInLayout,
   validMoveSemesters,
+  validSwapTargets,
 } from '../lib/planLayout'
 import type { CurriculumCatalog, GeneratedPlan, PlannerState } from '../types'
 import { PlanCard, PlanInsertSlot } from './CourseItems'
@@ -94,6 +95,11 @@ export default function PlanDragSurface({
   }, [drag, plan, planner, curriculum])
 
   const draggedCourse = drag ? resolveCourse(drag.courseId, curriculum) : undefined
+
+  const validSwapKeys = useMemo(() => {
+    if (!drag || !draggedCourse) return new Set<string>()
+    return validSwapTargets(draggedCourse, drag.fromSem, plan.sems, layout, planner)
+  }, [drag, draggedCourse, plan.sems, layout, planner])
 
   const canSwapWith = useCallback(
     (targetCourseId: string, targetSemCode: string) => {
@@ -356,10 +362,10 @@ export default function PlanDragSurface({
               className={`sem-body sem-body-drag ${borderClass} ${canMoveHere ? 'sem-drop-valid' : ''} ${isInvalid ? 'sem-drop-invalid' : ''}`}
             >
               {semPlan.courses.map((course) => {
+                const swapKey = `${sem.code}:${course.id}`
+                const swapAvailable = validSwapKeys.has(swapKey)
                 const swapCheck = drag ? canSwapWith(course.id, sem.code) : { ok: false, reason: '' }
-                const isOtherSem = !!drag && drag.fromSem !== sem.code
                 const swapHover =
-                  isOtherSem &&
                   hover?.kind === 'swap' &&
                   hover.semCode === sem.code &&
                   hover.courseId === course.id
@@ -373,6 +379,7 @@ export default function PlanDragSurface({
                     onToggle={() => onToggleExpanded(`${sem.code}-${course.id}`)}
                     isDragging={drag?.courseId === course.id && drag.fromSem === sem.code}
                     coachPulse={coachPulse}
+                    swapAvailable={swapAvailable}
                     swapHover={swapHover}
                     swapInvalid={swapInvalid}
                     swapHint={
@@ -380,7 +387,9 @@ export default function PlanDragSurface({
                         ? swapCheck.ok
                           ? `Swap with ${draggedCourse?.code ?? 'course'}`
                           : swapCheck.reason || "Can't swap"
-                        : undefined
+                        : swapAvailable
+                          ? '⇄ Swap'
+                          : undefined
                     }
                     onDragPointerDown={(e) => prepareDrag(course.id, sem.code, e)}
                     skipToggleRef={skipToggleRef}
