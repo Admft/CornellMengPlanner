@@ -4,7 +4,7 @@ import ExcelJS from 'exceljs'
 import { DEFAULT_STATE, type PlannerState, type Course } from '../src/types'
 import { DEFAULT_CURRICULUM, getCourseById, isOfferedIn } from '../src/data/courses'
 import { semRange, excelSemesters } from '../src/data/semesters'
-import { generatePlan, getCreditTotals, unscheduledReason } from '../src/lib/planEngine'
+import { generatePlan, getCreditTotals } from '../src/lib/planEngine'
 import { canPlaceCourse, canSwapCourses, layoutToPlan, planToLayout } from '../src/lib/planLayout'
 import { validateScheduleForExport } from '../src/lib/scheduleValidate'
 import { buildProposalWorkbook } from '../src/lib/excelExport'
@@ -16,14 +16,6 @@ const course = (id: string) => getCourseById(id)!
 const plan = generatePlan(state)
 assert.equal(plan.unscheduled.length, 0)
 assert.equal(validateScheduleForExport(state, plan).ok, true)
-const lastOccupied = plan.sems.filter(s => plan.plan[s.code].courses.length).at(-1)!
-assert.ok(plan.plan[lastOccupied.code].courses.some(c => c.id === 'EN5910'))
-const afterCapstone = { ...state, gradSem: 'FA30' }
-const futureSems = semRange(state.planFromSem, afterCapstone.gradSem)
-const futurePlan = layoutToPlan(planToLayout(plan), futureSems, state.curriculum)
-const electiveTerm = plan.sems.find(s => plan.plan[s.code].courses.some(c => c.id === 'EN6020el'))!
-assert.equal(canPlaceCourse(course('EN6020el'), futureSems.at(-1)!, futureSems, futurePlan.plan, afterCapstone, { fromSemCode: electiveTerm.code }).ok, false)
-
 assert.deepEqual(course('EN6010').seasons, ['Fall'])
 assert.deepEqual(course('EN6011').seasons, ['Spring'])
 assert.equal(isOfferedIn(course('EN5941'), semRange('SP26', 'SP26')[0]), false)
@@ -36,9 +28,9 @@ const movingState = { ...state, taken: new Set(['EN5900', 'EN5940', 'EN5980']) }
 const movingPlan = layoutToPlan(layout, sems, state.curriculum)
 assert.equal(canPlaceCourse(course('EN5930'), sems.find(s => s.code === 'FA27')!, sems, movingPlan.plan, movingState, { fromSemCode: 'FA26' }).ok, true)
 assert.equal(canPlaceCourse(course('EN5930'), sems.find(s => s.code === 'SP27')!, sems, movingPlan.plan, movingState, { fromSemCode: 'FA26' }).ok, false)
-assert.equal(canPlaceCourse(course('EN5930'), sems.find(s => s.code === 'FA28')!, sems, movingPlan.plan, movingState, { fromSemCode: 'FA26' }).ok, false)
+assert.equal(canPlaceCourse(course('EN5930'), sems.find(s => s.code === 'FA28')!, sems, movingPlan.plan, movingState, { fromSemCode: 'FA26' }).ok, true)
 layout.FA28 = ['EN5200']
-assert.equal(canSwapCourses(course('EN5930'), 'FA26', course('EN5200'), 'FA28', sems, layout, movingState).ok, false)
+assert.equal(canSwapCourses(course('EN5930'), 'FA26', course('EN5200'), 'FA28', sems, layout, movingState).ok, true)
 const duplicate = { ...state, obChoice: 'EN6020', elChoices: new Set(['EN6020el', 'EN6095', 'EN5500']) }
 assert.equal(Object.values(generatePlan(duplicate).plan).flatMap(s => s.courses).filter(c => c.code === 'ENMGT 6020').length, 1)
 const legacy = { ...state, returningStudent: true, programStartSem: 'SP25', planFromSem: 'FA26', gradSem: 'SP28', taken: new Set(['EN5930_legacy', 'EN5940', 'EN5080', 'EN6001']), takenSemesters: { EN5930_legacy: 'FA25', EN5940: 'SP26', EN5080: 'SU25', EN6001: 'SU25' }, elChoices: new Set(['EN6020el', 'EN5500', 'EN6095']) }
@@ -49,21 +41,18 @@ const fastPlan = generatePlan(feasible12)
 assert.equal(getCreditTotals(feasible12).takenCredits, 12)
 assert.equal(fastPlan.unscheduled.length, 0)
 assert.ok(fastPlan.plan.FA27.courses.some(c => c.id === 'EN5910'))
-const blocked12 = { ...feasible12, returningStudent: true, taken: new Set(['EN5900', 'EN5930_legacy', 'EN5940']) }
-const blockedPlan = generatePlan(blocked12)
-assert.ok(blockedPlan.unscheduled.some(c => c.id === 'EN5910'))
-assert.match(unscheduledReason(course('EN5910'), blocked12, blockedPlan), /ENMGT 5980/)
 const userCourses = { ...state, returningStudent: true, planFromSem: 'SP27', gradSem: 'FA27', crLimit: 12,
   taken: new Set(['EN5940', 'EN5080', 'EN6001', 'EN5980', 'EN5960']), obChoice: '', elChoices: new Set(['EN5500', 'EN6020el']), resChoice: 'session2' as const }
 const userPlan = generatePlan(userCourses)
 assert.equal(getCreditTotals(userCourses).takenCredits, 12)
-assert.deepEqual(userPlan.unscheduled.map(c => c.id), ['EN5910'])
-assert.equal(getCreditTotals(userCourses).total, 26)
-assert.match(unscheduledReason(course('EN5910'), userCourses, userPlan), /ENMGT 5930/)
+assert.deepEqual(userPlan.unscheduled, [])
+assert.equal(getCreditTotals(userCourses).total, 30)
+assert.ok(userPlan.plan.FA27.courses.some(c => c.id === 'EN5910'))
+assert.ok(userPlan.plan.FA27.courses.some(c => c.id === 'EN5930'))
+assert.ok(userPlan.plan.SP27.courses.some(c => c.id === 'EN5900'))
 const extendedUserPlan = generatePlan({ ...userCourses, gradSem: 'SP28' })
 assert.equal(extendedUserPlan.unscheduled.length, 0)
 assert.equal(getCreditTotals(userCourses, extendedUserPlan).total, 30)
-assert.ok(extendedUserPlan.plan.SP28.courses.some(c => c.id === 'EN5910'))
 // Compare the solver to exhaustive enumeration on small independent fixtures.
 function bruteFits(input: PlannerState, required: Course[]): boolean {
   const terms = semRange(input.planFromSem, input.gradSem)
@@ -117,7 +106,7 @@ for (let seed = 0; seed < 96; seed++) {
     Object.values(generated.plan).forEach(s => assert.ok(s.cr <= (s.sem.season === 'Summer' ? 2 : fixture.crLimit)))
   }
 }
-console.log('Optimizer: feasible/blocked 12-credit scenarios and 96 exhaustive feasibility comparisons passed.')
+console.log('Optimizer: concurrent-capstone 12-credit scenarios and 96 exhaustive feasibility comparisons passed.')
 const template = await fs.readFile('public/Cornellproposal.xlsx')
 for (const [label, input] of [['incoming', state], ['legacy', legacy], ['custom', { ...legacy, customTaken: [{ id: 'custom1', code: 'TEST 1234', name: 'Approved historical elective', credits: 1.5, cat: 'el', semCode: 'SP26' }] }]] as const) {
   const p = generatePlan(input as PlannerState)
@@ -158,6 +147,7 @@ const imported = await importCurriculumFromXlsx(old as unknown as ArrayBuffer)
 assert.equal(imported.catalog.req.find(c => c.id === 'EN5930')?.credits, 3)
 assert.equal(imported.catalog.req.some(c => c.id === 'EN5940'), false)
 assert.deepEqual(imported.catalog.pd1.seasons, ['Fall'])
+assert.deepEqual(imported.catalog.req.find(c => c.id === 'EN5910')?.prereqs, [])
 console.log('All planner/export regression checks passed.')
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

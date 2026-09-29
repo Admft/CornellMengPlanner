@@ -81,9 +81,7 @@ function buildCourse(
 
   const seasons = parseSeasons(comment)
   const prereqs: string[] = []
-  if (cat === 'cap') {
-    prereqs.push('EN5900', 'EN5930', 'EN5941', 'EN5942', 'EN5980')
-  }
+  // Current DL guidance permits concurrent capstone coursework.
 
   return {
     id,

@@ -1365,6 +1365,8 @@ export default function Planner() {
               Only moves that meet the course rules and your credit limit are allowed.
             </p>
 
+            <div className="alert alert-ok"><div><strong>Capstone guidance:</strong> You may take ENMGT 5910 alongside other courses. The DL program recommends your last or second-to-last semester and suggests taking Project Management beforehand. These recommendations do not block your schedule.</div></div>
+
             {dragFeedback && (
               <div className="plan-drag-feedback">
                 <div

@@ -196,7 +196,6 @@ function greedyPlan(state: PlannerState, selected: Course[]): GeneratedPlan {
       .filter(
         (course) =>
           isOfferedIn(course, sem) &&
-          (course.cat !== 'cap' || sem.code === sems[sems.length - 1].code) &&
           prereqsSatisfied(course.prereqs ?? [], done, ctx),
       )
       .sort((a, b) => a.pri - b.pri || a.credits - b.credits)
@@ -238,7 +237,7 @@ function scheduleQueue(state: PlannerState, courses: Course[], effort = { remain
     const sems = fallback.sems.slice(0, horizon)
     const capacity = sems.map(s => s.season === 'Summer' ? 2 : state.crLimit)
     if (capacity.reduce((a, b) => a + b, 0) < fullCredits) continue
-    const initial = courses.map(c => sems.flatMap((s, i) => isOfferedIn(c, s) && (c.cat !== 'cap' || i === horizon - 1) ? [i] : []))
+    const initial = courses.map(c => sems.flatMap((s, i) => isOfferedIn(c, s) ? [i] : []))
     const search = (domains: number[][]): number[] | null => {
       if (--effort.remaining < 0) return null
       domains = domains.map(d => [...d])
@@ -272,7 +271,7 @@ function scheduleQueue(state: PlannerState, courses: Course[], effort = { remain
       if (!undecided.length) return domains.map(d => d[0])
       undecided.sort((a, b) => domains[a].length - domains[b].length || courses[b].prereqs.length - courses[a].prereqs.length || courses[b].credits - courses[a].credits || courses[a].pri - courses[b].pri)
       const next = undecided[0]
-      for (const term of domains[next]) {
+      for (const term of courses[next].cat === 'cap' ? [...domains[next]].reverse() : domains[next]) {
         const branch = domains.map(d => [...d])
         branch[next] = [term]
         const result = search(branch)

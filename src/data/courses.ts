@@ -35,11 +35,11 @@ export const DEFAULT_CURRICULUM: CurriculumCatalog = {
       name: 'Engineering Management Project',
       credits: 4,
       seasons: ['Fall', 'Spring'],
-      prereqs: ['EN5900', 'EN5930', 'EN5941', 'EN5942', 'EN5980'],
+      prereqs: [],
       cat: 'cap',
       pri: 3,
       desc: 'Capstone project integrating all MEM competencies. Students apply project management, data analytics, financial analysis, and decision frameworks to a real-world management challenge.',
-      notes: 'Offered Fall and Spring. Prerequisites: ENMGT 5900, 5930, 5941, 5942, and 5980 must all be completed first.',
+      notes: 'Offered Fall and Spring. Per DL program guidance: may be taken alongside other courses. Last or second-to-last semester recommended; Project Management beforehand suggested. These are recommendations, not scheduling blocks.',
       excelRow: 15,
     },
     {

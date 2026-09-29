@@ -1,5 +1,12 @@
 # Planning rules and verification
 
+## Current capstone clarification — supersedes earlier conclusions below
+
+The user supplied a direct reply from the DL Assistant Director to their prerequisite question: the project may be taken with other courses; the last or second-to-last semester is recommended, and Project Management beforehand is suggested. These are advisory rather than hard scheduling restrictions. Remove the older template prerequisite blocks and the final-semester-only block from generation, imports, moves, swaps and export validation. Keep Fall/Spring offerings and credit limits. The solver prefers later capstone placements and displays the program recommendations.
+
+The earlier Spring 2028-only conclusion below is superseded. For the reported 12 completed credits, returning-student status, two 3-credit electives and Residential II, the tested Spring–Fall 2027 plan now schedules all 30 credits, with Analytics and capstone together in Fall and Project Management in Spring.
+
+
 Reviewed 2026-09-29 against the user-supplied Summer 2026 and old January-start proposal forms and three program emails.
 
 - Seasonal offerings recur in subsequent years as a planning assumption requested by the user, not a guarantee of future registration availability.
