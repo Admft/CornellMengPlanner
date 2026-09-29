@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import ExcelJS from 'exceljs'
-import { DEFAULT_STATE, type PlannerState } from '../src/types'
+import { DEFAULT_STATE, type PlannerState, type Course } from '../src/types'
 import { DEFAULT_CURRICULUM, getCourseById, isOfferedIn } from '../src/data/courses'
 import { semRange, excelSemesters } from '../src/data/semesters'
-import { generatePlan, getCreditTotals } from '../src/lib/planEngine'
+import { generatePlan, getCreditTotals, unscheduledReason } from '../src/lib/planEngine'
 import { canPlaceCourse, canSwapCourses, layoutToPlan, planToLayout } from '../src/lib/planLayout'
 import { validateScheduleForExport } from '../src/lib/scheduleValidate'
 import { buildProposalWorkbook } from '../src/lib/excelExport'
@@ -16,6 +16,14 @@ const course = (id: string) => getCourseById(id)!
 const plan = generatePlan(state)
 assert.equal(plan.unscheduled.length, 0)
 assert.equal(validateScheduleForExport(state, plan).ok, true)
+const lastOccupied = plan.sems.filter(s => plan.plan[s.code].courses.length).at(-1)!
+assert.ok(plan.plan[lastOccupied.code].courses.some(c => c.id === 'EN5910'))
+const afterCapstone = { ...state, gradSem: 'FA30' }
+const futureSems = semRange(state.planFromSem, afterCapstone.gradSem)
+const futurePlan = layoutToPlan(planToLayout(plan), futureSems, state.curriculum)
+const electiveTerm = plan.sems.find(s => plan.plan[s.code].courses.some(c => c.id === 'EN6020el'))!
+assert.equal(canPlaceCourse(course('EN6020el'), futureSems.at(-1)!, futureSems, futurePlan.plan, afterCapstone, { fromSemCode: electiveTerm.code }).ok, false)
+
 assert.deepEqual(course('EN6010').seasons, ['Fall'])
 assert.deepEqual(course('EN6011').seasons, ['Spring'])
 assert.equal(isOfferedIn(course('EN5941'), semRange('SP26', 'SP26')[0]), false)
@@ -34,6 +42,82 @@ assert.equal(canSwapCourses(course('EN5930'), 'FA26', course('EN5200'), 'FA28', 
 const duplicate = { ...state, obChoice: 'EN6020', elChoices: new Set(['EN6020el', 'EN6095', 'EN5500']) }
 assert.equal(Object.values(generatePlan(duplicate).plan).flatMap(s => s.courses).filter(c => c.code === 'ENMGT 6020').length, 1)
 const legacy = { ...state, returningStudent: true, programStartSem: 'SP25', planFromSem: 'FA26', gradSem: 'SP28', taken: new Set(['EN5930_legacy', 'EN5940', 'EN5080', 'EN6001']), takenSemesters: { EN5930_legacy: 'FA25', EN5940: 'SP26', EN5080: 'SU25', EN6001: 'SU25' }, elChoices: new Set(['EN6020el', 'EN5500', 'EN6095']) }
+// Twelve completed credits can be enough, but the identity of those credits matters.
+const feasible12 = { ...state, planFromSem: 'SP27', gradSem: 'FA27', crLimit: 12,
+  taken: new Set(['EN5900', 'EN5930', 'EN5980', 'EN5080', 'EN6001']) }
+const fastPlan = generatePlan(feasible12)
+assert.equal(getCreditTotals(feasible12).takenCredits, 12)
+assert.equal(fastPlan.unscheduled.length, 0)
+assert.ok(fastPlan.plan.FA27.courses.some(c => c.id === 'EN5910'))
+const blocked12 = { ...feasible12, returningStudent: true, taken: new Set(['EN5900', 'EN5930_legacy', 'EN5940']) }
+const blockedPlan = generatePlan(blocked12)
+assert.ok(blockedPlan.unscheduled.some(c => c.id === 'EN5910'))
+assert.match(unscheduledReason(course('EN5910'), blocked12, blockedPlan), /ENMGT 5980/)
+const userCourses = { ...state, returningStudent: true, planFromSem: 'SP27', gradSem: 'FA27', crLimit: 12,
+  taken: new Set(['EN5940', 'EN5080', 'EN6001', 'EN5980', 'EN5960']), obChoice: '', elChoices: new Set(['EN5500', 'EN6020el']), resChoice: 'session2' as const }
+const userPlan = generatePlan(userCourses)
+assert.equal(getCreditTotals(userCourses).takenCredits, 12)
+assert.deepEqual(userPlan.unscheduled.map(c => c.id), ['EN5910'])
+assert.equal(getCreditTotals(userCourses).total, 26)
+assert.match(unscheduledReason(course('EN5910'), userCourses, userPlan), /ENMGT 5930/)
+const extendedUserPlan = generatePlan({ ...userCourses, gradSem: 'SP28' })
+assert.equal(extendedUserPlan.unscheduled.length, 0)
+assert.equal(getCreditTotals(userCourses, extendedUserPlan).total, 30)
+assert.ok(extendedUserPlan.plan.SP28.courses.some(c => c.id === 'EN5910'))
+// Compare the solver to exhaustive enumeration on small independent fixtures.
+function bruteFits(input: PlannerState, required: Course[]): boolean {
+  const terms = semRange(input.planFromSem, input.gradSem)
+  const assigned: number[] = []
+  const visit = (index: number): boolean => {
+    if (index === required.length) return required.every((c, i) => c.prereqs.every(p => assigned[required.findIndex(x => x.id === p)] < assigned[i]))
+    return terms.some((term, t) => {
+      if (!isOfferedIn(required[index], term)) return false
+      const load = assigned.reduce((n, a, j) => n + (a === t ? required[j].credits : 0), required[index].credits)
+      if (load > (term.season === 'Summer' ? 2 : input.crLimit)) return false
+      assigned.push(t)
+      const found = visit(index + 1)
+      assigned.pop()
+      return found
+    })
+  }
+  return visit(0)
+}
+const trapCourses: Course[] = [
+  { ...course('EN5900'), id: 'FLEX', code: 'TEST FLEX', credits: 3, seasons: ['Spring', 'Fall'], prereqs: [], pri: 1 },
+  { ...course('EN5900'), id: 'SPRING', code: 'TEST SPRING', credits: 3, seasons: ['Spring'], prereqs: [], pri: 2 },
+  { ...course('EN5910'), id: 'CAP', code: 'TEST CAP', credits: 1, seasons: ['Fall'], prereqs: ['SPRING'], pri: 3 },
+]
+const trap = { ...state, planFromSem: 'SP27', gradSem: 'FA27', crLimit: 4, curriculum: { ...DEFAULT_CURRICULUM, req: trapCourses }, taken: new Set(['EN6002']), obChoice: '', elChoices: new Set<string>() }
+const escaped = generatePlan(trap)
+assert.equal(escaped.unscheduled.length, 0)
+assert.deepEqual(escaped.plan.SP27.courses.map(c => c.id), ['SPRING'])
+assert.ok(escaped.plan.FA27.courses.some(c => c.id === 'FLEX'))
+const electives = [
+  { ...course('EN5200'), id: 'FALL', code: 'TEST FALL', credits: 3, seasons: ['Fall'] as Course['seasons'] },
+  { ...course('EN5500'), id: 'SPRING', code: 'TEST SPRING', credits: 3, seasons: ['Spring'] as Course['seasons'] },
+  { ...course('EN5500'), id: 'SUMMER', code: 'TEST SUMMER', credits: 1, seasons: ['Summer'] as Course['seasons'] },
+]
+const electiveFixture = { ...trap, curriculum: { ...DEFAULT_CURRICULUM, req: [{ ...trapCourses[0], seasons: ['Fall'] as Course['seasons'] }], el: electives },
+  customTaken: [{ id: 'history', code: 'HIST', name: 'Historical credits', credits: 22, cat: 'req' as const }], elChoices: new Set(electives.map(c => c.id)) }
+const electivePlan = generatePlan(electiveFixture)
+assert.equal(electivePlan.unscheduled.length, 0)
+assert.ok(electivePlan.plan.SP27.courses.some(c => c.id === 'SPRING'))
+assert.ok(!Object.values(electivePlan.plan).some(s => s.courses.some(c => c.id === 'FALL')))
+for (let seed = 0; seed < 96; seed++) {
+  const req: Course[] = Array.from({ length: 4 }, (_, i) => ({ ...course('EN5900'), id: `TEST${i}`, code: `TEST ${i}`, pri: i,
+    credits: 1 + ((seed >> i) % 4), seasons: ((seed + i) % 3 === 0 ? ['Spring'] : (seed + i) % 3 === 1 ? ['Fall'] : ['Spring', 'Fall']) as Course['seasons'],
+    prereqs: i === 3 && seed % 2 === 0 ? ['TEST1'] : [] }))
+  const fixture = { ...state, planFromSem: 'SP27', gradSem: 'FA28', crLimit: 4,
+    curriculum: { ...DEFAULT_CURRICULUM, req }, taken: new Set(['EN6002']), obChoice: '', elChoices: new Set<string>() }
+  const generated = generatePlan(fixture)
+  assert.equal(generated.unscheduled.length === 0, bruteFits(fixture, req), `solver feasibility seed ${seed}`)
+  if (!generated.unscheduled.length) {
+    const placement = new Map(Object.values(generated.plan).flatMap((s, t) => s.courses.map(c => [c.id, t] as const)))
+    req.forEach(c => c.prereqs.forEach(p => assert.ok(placement.get(p)! < placement.get(c.id)!)))
+    Object.values(generated.plan).forEach(s => assert.ok(s.cr <= (s.sem.season === 'Summer' ? 2 : fixture.crLimit)))
+  }
+}
+console.log('Optimizer: feasible/blocked 12-credit scenarios and 96 exhaustive feasibility comparisons passed.')
 const template = await fs.readFile('public/Cornellproposal.xlsx')
 for (const [label, input] of [['incoming', state], ['legacy', legacy], ['custom', { ...legacy, customTaken: [{ id: 'custom1', code: 'TEST 1234', name: 'Approved historical elective', credits: 1.5, cat: 'el', semCode: 'SP26' }] }]] as const) {
   const p = generatePlan(input as PlannerState)

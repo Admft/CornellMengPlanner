@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import SiteHeader from '../components/SiteHeader'
 import { CHANGELOG, LATEST_VERSION } from '../data/changelog'
 import SiteFooter from '../components/SiteFooter'
 import { setPageMeta } from '../lib/pageMeta'
@@ -16,31 +16,13 @@ export default function ChangelogPage() {
 
   return (
     <>
-      <header className="hdr">
-        <div className="hdr-brand">
-          <img
-            src="/Cornell_University_seal.svg.png"
-            alt="Cornell University"
-            className="hdr-logo"
-          />
-          <span className="hdr-word">Cornell Engineering</span>
-          <span className="hdr-sep">|</span>
-          <span className="hdr-app hdr-app-full">M.Eng. Management · Changelog</span>
-          <span className="hdr-app hdr-app-short">· Changelog</span>
-        </div>
-        <Link to="/" className="hdr-request">
-          <span className="hdr-request-full">← Back to planner</span>
-          <span className="hdr-request-short">← Planner</span>
-        </Link>
-      </header>
+      <SiteHeader />
 
       <main className="main changelog-main">
         <div className="changelog-hdr">
           <h1 className="step-title">Changelog</h1>
           <p className="step-sub">
-            Versions are dated releases (<code>{LATEST_VERSION}</code> = June 29, 2026).
-            When something ships, the version date bumps and returning visitors see a short
-            notice on the planner.
+            A record of improvements to course planning, scheduling, and proposal exports.
           </p>
         </div>
 

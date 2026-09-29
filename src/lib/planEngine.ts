@@ -91,6 +91,7 @@ function optimizeElectives(state: PlannerState, candidates: Course[]): Course[] 
 
   let best: Course[] | null = null
   let bestTotal = Infinity
+  const choices: { courses: Course[]; total: number }[] = []
 
   for (let mask = 0; mask < 1 << n; mask++) {
     const subset: Course[] = []
@@ -102,6 +103,7 @@ function optimizeElectives(state: PlannerState, candidates: Course[]): Course[] 
     const total =
       already + fixedCredits + subset.reduce((sum, course) => sum + course.credits, 0)
     if (total < MIN_DEGREE_CREDITS) continue
+    choices.push({ courses: subset, total })
 
     if (
       total < bestTotal ||
@@ -112,7 +114,17 @@ function optimizeElectives(state: PlannerState, candidates: Course[]): Course[] 
     }
   }
 
-  if (best) return best
+  if (best) {
+    // Credit-efficient choices are useful only if they can actually be scheduled.
+    // Consider only electives the student selected, in credit/count preference order.
+    choices.sort((a, b) => a.total - b.total || a.courses.length - b.courses.length)
+    const effort = { remaining: 50000 }
+    for (const choice of choices.slice(0, 256)) {
+      if (!scheduleQueue(state, [...fixed, ...choice.courses], effort).unscheduled.length) return choice.courses
+      if (effort.remaining <= 0) break
+    }
+    return best
+  }
 
   // Can't reach 30 with minimum electives — add more (prefer smaller-credit makeup courses)
   const sorted = [...candidates].sort((a, b) => a.credits - b.credits || a.pri - b.pri)
@@ -161,12 +173,12 @@ export function getSkippedElectives(state: PlannerState): Course[] {
   return chosen.filter((c) => !optimizedIds.has(c.id))
 }
 
-export function generatePlan(state: PlannerState): GeneratedPlan {
+function greedyPlan(state: PlannerState, selected: Course[]): GeneratedPlan {
   const planStartSem = planningStartSemester(state)
   const sems = semRange(planStartSem, state.gradSem)
   const done = new Set(state.taken)
   const ctx = completionCtx(state)
-  let queue = buildQueue(state)
+  let queue = [...selected]
 
   const limits = {
     Fall: state.crLimit,
@@ -184,6 +196,7 @@ export function generatePlan(state: PlannerState): GeneratedPlan {
       .filter(
         (course) =>
           isOfferedIn(course, sem) &&
+          (course.cat !== 'cap' || sem.code === sems[sems.length - 1].code) &&
           prereqsSatisfied(course.prereqs ?? [], done, ctx),
       )
       .sort((a, b) => a.pri - b.pri || a.credits - b.credits)
@@ -206,6 +219,96 @@ export function generatePlan(state: PlannerState): GeneratedPlan {
   }
 
   return { plan, unscheduled: queue, sems }
+}
+
+/** Search whole schedules, propagating seasons, capacity and prerequisite deadlines.
+ * A bounded search keeps imported catalogs responsive; exhaustion is never proof
+ * that a degree is impossible. Existing valid schedules remain the fallback.
+ */
+export function generatePlan(state: PlannerState): GeneratedPlan {
+  return scheduleQueue(state, buildQueue(state))
+}
+
+function scheduleQueue(state: PlannerState, courses: Course[], effort = { remaining: 50000 }): GeneratedPlan {
+  const fallback = greedyPlan(state, courses)
+  if (!courses.length || !fallback.sems.length) return fallback
+  const ctx = completionCtx(state)
+  const fullCredits = courses.reduce((sum, c) => sum + c.credits, 0)
+  for (let horizon = 1; horizon <= fallback.sems.length; horizon++) {
+    const sems = fallback.sems.slice(0, horizon)
+    const capacity = sems.map(s => s.season === 'Summer' ? 2 : state.crLimit)
+    if (capacity.reduce((a, b) => a + b, 0) < fullCredits) continue
+    const initial = courses.map(c => sems.flatMap((s, i) => isOfferedIn(c, s) && (c.cat !== 'cap' || i === horizon - 1) ? [i] : []))
+    const search = (domains: number[][]): number[] | null => {
+      if (--effort.remaining < 0) return null
+      domains = domains.map(d => [...d])
+      let changed = true
+      while (changed) {
+        changed = false
+        const loads = capacity.map(() => 0)
+        domains.forEach((d, i) => { if (d.length === 1) loads[d[0]] += courses[i].credits })
+        if (loads.some((load, i) => load > capacity[i] + 0.001)) return null
+        for (let i = 0; i < courses.length; i++) {
+          const previous = domains[i]
+          domains[i] = previous.filter(term => {
+            if (previous.length > 1 && loads[term] + courses[i].credits > capacity[term] + 0.001) return false
+            // Optimistic completion set: each prerequisite must have an earlier
+            // possible term. Repeated propagation pushes dependent deadlines back.
+            const before = new Set(state.taken)
+            domains.forEach((d, j) => { if (j !== i && d.some(t => t < term)) before.add(courses[j].id) })
+            if (!prereqsSatisfied(courses[i].prereqs, before, ctx)) return false
+            // If this course is fixed here, every dependent still needs a valid
+            // later placement (including equivalent legacy requirement IDs).
+            return courses.every((dependent, j) => {
+              if (j === i || !dependent.prereqs.some(p => !isCourseCompleted(p, state.taken, ctx) && isCourseCompleted(p, new Set([courses[i].id]), ctx))) return true
+              return domains[j].some(t => t > term)
+            })
+          })
+          if (!domains[i].length) return null
+          if (domains[i].length !== previous.length) changed = true
+        }
+      }
+      const undecided = courses.map((_, i) => i).filter(i => domains[i].length > 1)
+      if (!undecided.length) return domains.map(d => d[0])
+      undecided.sort((a, b) => domains[a].length - domains[b].length || courses[b].prereqs.length - courses[a].prereqs.length || courses[b].credits - courses[a].credits || courses[a].pri - courses[b].pri)
+      const next = undecided[0]
+      for (const term of domains[next]) {
+        const branch = domains.map(d => [...d])
+        branch[next] = [term]
+        const result = search(branch)
+        if (result) return result
+        if (effort.remaining < 0) break
+      }
+      return null
+    }
+    const assignment = search(initial)
+    if (assignment) {
+      const plan = Object.fromEntries(fallback.sems.map(sem => [sem.code, { sem, courses: [] as Course[], cr: 0 }]))
+      courses.forEach((course, i) => {
+        const term = plan[sems[assignment[i]].code]
+        term.courses.push(course)
+        term.cr += course.credits
+      })
+      return { plan, sems: fallback.sems, unscheduled: [] }
+    }
+    if (effort.remaining < 0) break
+  }
+  return fallback
+}
+
+/** Explain the current obstruction without claiming a heuristic proves impossibility. */
+export function unscheduledReason(course: Course, state: PlannerState, plan: GeneratedPlan): string {
+  const offered = plan.sems.filter(s => isOfferedIn(course, s))
+  if (!offered.length) return `No ${course.seasons.join(' or ')} offering in this planning window${course.availableFrom ? ` (available from ${course.availableFrom})` : ''}.`
+  const last = offered[offered.length - 1]
+  const before = new Set(state.taken)
+  for (const sem of plan.sems) {
+    if (sem.code === last.code) break
+    plan.plan[sem.code]?.courses.forEach(c => before.add(c.id))
+  }
+  const missing = course.prereqs.filter(p => !isCourseCompleted(p, before, completionCtx(state)))
+  if (missing.length) return `Must finish ${missing.map(id => resolveCourse(id, state.curriculum)?.code ?? id).join(', ')} before ${last.label}. These prerequisites are not completed earlier in this arrangement; concurrent enrollment is not assumed.`
+  return `No complete arrangement found within the current semester limits. Try a later graduation date or a higher credit limit; summer remains capped at 2 credits.`
 }
 
 export function getAllPlacements(

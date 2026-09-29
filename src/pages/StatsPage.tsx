@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import SiteHeader from '../components/SiteHeader'
 import {
   devicePercent,
   detectDevice,
@@ -127,23 +127,7 @@ export default function StatsPage() {
 
   return (
     <>
-      <header className="hdr">
-        <div className="hdr-brand">
-          <img
-            src="/Cornell_University_seal.svg.png"
-            alt="Cornell University"
-            className="hdr-logo"
-          />
-          <span className="hdr-word">Cornell Engineering</span>
-          <span className="hdr-sep">|</span>
-          <span className="hdr-app hdr-app-full">M.Eng. Management · Usage Stats</span>
-          <span className="hdr-app hdr-app-short">· Usage Stats</span>
-        </div>
-        <Link to="/" className="hdr-request">
-          <span className="hdr-request-full">← Back to planner</span>
-          <span className="hdr-request-short">← Planner</span>
-        </Link>
-      </header>
+      <SiteHeader />
 
       <main className="main stats-main">
         <div className="stats-hdr-row">

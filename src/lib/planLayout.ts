@@ -101,6 +101,10 @@ function canPlaceInLayout(
     }
   }
 
+  if (course.cat === 'cap' && sems.slice(targetIdx + 1).some(sem => (layout[sem.code] ?? []).length > 0)) {
+    return { ok: false, reason: `${course.code} must be taken in your final semester with planned courses.` }
+  }
+
   const before = coursesBeforeInLayout(sems, layout, targetIdx)
   const done = new Set([...state.taken, ...before])
   const ctx: CompletionContext = { returningStudent: state.returningStudent }

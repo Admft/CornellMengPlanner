@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import SiteHeader from './components/SiteHeader'
 import { CourseListItem, PlanCard } from './components/CourseItems'
 import { FeatureRequestModal } from './components/FeatureRequestModal'
 import SiteFooter from './components/SiteFooter'
 import PlanDragCoach from './components/PlanDragCoach'
 import PlanDragSurface from './components/PlanDragSurface'
-import WhatsNewBanner from './components/WhatsNewBanner'
 import { hasSeenDragCoach } from './lib/dragCoach'
 import {
   DEFAULT_CURRICULUM,
@@ -20,6 +19,7 @@ import { importCurriculumFromXlsx } from './lib/curriculumImport'
 import { exportProposalExcel } from './lib/excelExport'
 import {
   generatePlan,
+  unscheduledReason,
   getCreditTotals,
   getSkippedElectives,
   hasWorkshopsDone,
@@ -80,10 +80,10 @@ interface AppState {
 }
 
 const STEPS = [
-  { label: 'Timeline', short: 'Timeline' },
-  { label: 'Courses Taken', short: 'Taken' },
-  { label: 'Your Choices', short: 'Choices' },
-  { label: 'Your Plan', short: 'Plan' },
+  { label: 'Your timeline', short: 'Timeline', description: 'Set your pace and graduation' },
+  { label: 'Completed courses', short: 'Completed', description: 'Bring your progress with you' },
+  { label: 'Course choices', short: 'Choices', description: 'Choose what comes next' },
+  { label: 'Semester plan', short: 'Plan', description: 'Arrange, review, and export' },
 ] as const
 const EL_MIN = 2
 
@@ -98,8 +98,10 @@ function CourseList({
   takenSemesters,
   takenSemOptions,
   onTakenSemChange,
+  search = '',
 }: {
   courses: Course[]
+  search?: string
   inputType: 'checkbox' | 'radio'
   name: string
   selected: Set<string> | string
@@ -112,7 +114,7 @@ function CourseList({
 }) {
   return (
     <div className="clist">
-      {courses.map((course) => {
+      {courses.filter(course => `${course.code} ${course.name} ${course.seasons.join(' ')}`.toLowerCase().includes(search.trim().toLowerCase())).map((course) => {
         const checked =
           inputType === 'radio'
             ? selected === course.id
@@ -171,6 +173,7 @@ export default function Planner() {
     tone: 'ok' | 'warn'
   } | null>(null)
   const [errors, setErrors] = useState<Record<string, boolean>>({})
+  const [courseSearch, setCourseSearch] = useState('')
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [exportSuccess, setExportSuccess] = useState(false)
@@ -328,7 +331,6 @@ export default function Planner() {
     ...LEGACY_COURSES.filter((course) => takenSet.has(course.id)),
   ]
   const pct = Math.min(100, Math.round((credits.total / 30) * 100))
-  const creditOvershoot = credits.total - 30
 
   const planLayout = state.planLayout ?? planToLayout(basePlan)
 
@@ -446,6 +448,7 @@ export default function Planner() {
 
   function goNext() {
     if (!validate(state.step)) return
+    setCourseSearch('')
     if (state.step < 4) {
       setState((prev) => ({
         ...prev,
@@ -457,6 +460,7 @@ export default function Planner() {
   }
 
   function goBack() {
+    setCourseSearch('')
     if (state.step > 1) {
       setState((prev) => ({ ...prev, step: prev.step - 1 }))
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -488,60 +492,8 @@ export default function Planner() {
 
   return (
     <>
-      <div className="sticky-top">
-        <header className="hdr">
-          <div className="hdr-brand">
-            <img
-              src="/Cornell_University_seal.svg.png"
-              alt="Cornell University"
-              className="hdr-logo"
-            />
-            <span className="hdr-word">Cornell Engineering</span>
-            <span className="hdr-sep">|</span>
-            <span className="hdr-app hdr-app-full">M.Eng. Management · Course Planner</span>
-            <span className="hdr-app hdr-app-short">· MEM Course Planner</span>
-          </div>
-          <div className="hdr-actions">
-            <Link to="/changelog" className="hdr-link">
-              Changelog
-            </Link>
-            <Link to="/stats" className="hdr-link">
-              Stats
-            </Link>
-            <button
-              type="button"
-              className="hdr-request"
-              onClick={() => setShowFeatureRequest(true)}
-            >
-              <span className="hdr-request-full">Request a change</span>
-              <span className="hdr-request-short">Feedback</span>
-            </button>
-          </div>
-        </header>
-
-        <WhatsNewBanner />
-
-        <nav className="pnav">
-          {STEPS.map((step, index) => {
-            const stepNum = index + 1
-            const isActive = state.step === stepNum
-            const isDone = state.step > stepNum
-            return (
-              <div
-                key={step.label}
-                className={`pstep ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}
-              >
-                <div className="pstep-num">{isDone ? '✓' : stepNum}</div>
-                <div className="pstep-lbl">
-                  <span className="pstep-lbl-full">{step.label}</span>
-                  <span className="pstep-lbl-short">{step.short}</span>
-                </div>
-              </div>
-            )
-          })}
-        </nav>
-      </div>
-
+      <a className="skip-link" href="#planner-content">Skip to planner</a>
+      <SiteHeader onFeedback={() => setShowFeatureRequest(true)} />
       <FeatureRequestModal
         open={showFeatureRequest}
         onClose={() => setShowFeatureRequest(false)}
@@ -549,77 +501,44 @@ export default function Planner() {
 
       <PlanDragCoach open={showDragCoach} onClose={closeDragCoach} />
 
-      <main className="main">
+      <div className={`planner-layout planner-step-${state.step}`}>
+        <aside className="planner-sidebar" aria-label="Planning progress">
+          <p className="eyebrow">Your degree, your pace</p>
+          <nav className="planner-steps" aria-label="Planning steps">
+            {STEPS.map((step, index) => {
+              const stepNum = index + 1
+              return <button key={step.label} type="button"
+                className={`planner-step ${state.step === stepNum ? 'active' : ''} ${state.step > stepNum ? 'done' : ''}`}
+                aria-current={state.step === stepNum ? 'step' : undefined}
+                disabled={stepNum > state.step}
+                onClick={() => { setCourseSearch(''); setState(prev => ({ ...prev, step: stepNum })); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
+                <span className="step-marker">{state.step > stepNum ? '✓' : `0${stepNum}`}</span>
+                <span className="step-copy"><strong>{step.label}</strong><small>{step.description}</small></span>
+                <span className="step-mobile-label">{step.short}</span>
+              </button>
+            })}
+          </nav>
+          <div className="sidebar-overview">
+            <p className="eyebrow">The essentials</p>
+            <div className="sidebar-credit"><strong>30</strong><span>minimum credits<br />for your M.Eng.</span></div>
+            <dl>
+              <div><dt>Planning from</dt><dd>{planSemesterOptions.find(s => s.code === state.planFromSem)?.label}</dd></div>
+              <div><dt>Graduation goal</dt><dd>{gradSemesterOptions.find(s => s.code === state.gradSem)?.label}</dd></div>
+              <div><dt>Semester limit</dt><dd>{state.crLimit} credits</dd></div>
+              {state.step > 1 && <div><dt>Already completed</dt><dd>{credits.takenCredits} credits</dd></div>}
+            </dl>
+            <p className="sidebar-note">Plan with recurring seasonal offerings. Confirm your final choices with your advisor.</p>
+          </div>
+        </aside>
+      <main id="planner-content" className="main planner-main">
+        <p className="eyebrow step-eyebrow">Engineering Management <span>/</span> Step {state.step} of 4</p>
         {state.step === 1 && (
           <section className="step active">
-            <h1 className="step-title">Set your planning timeline</h1>
-            <p className="step-sub">
-              Enter your student information, pick the <strong>next semester</strong> you
-              want to plan for, and when you want to graduate. Already partway through
-              the program? Mark completed courses in Step 2 — you don&apos;t need your
-              original start date here.
-            </p>
+            <h1 className="step-title">Make room for what’s next.</h1>
+            <p className="step-sub">Build your Cornell MEM degree around your schedule. Start with your timeline; we’ll help fit the courses together.</p>
 
-            <div className="card">
-              <div className="sec-label">Student information</div>
-              <div className="form-row">
-                <div className="fg">
-                  <label htmlFor="name">Name</label>
-                  <input
-                    id="name"
-                    type="text"
-                    value={state.name}
-                    onChange={(e) =>
-                      setState((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    placeholder="Adam Moffat"
-                  />
-                </div>
-                <div className="fg">
-                  <label htmlFor="netId">NetID</label>
-                  <input
-                    id="netId"
-                    type="text"
-                    value={state.netId}
-                    onChange={(e) =>
-                      setState((prev) => ({ ...prev, netId: e.target.value }))
-                    }
-                    placeholder="Arm393"
-                  />
-                </div>
-              </div>
-              <div className="form-row" style={{ marginTop: 16 }}>
-                <div className="fg">
-                  <label htmlFor="studentId">Student ID #</label>
-                  <input
-                    id="studentId"
-                    type="text"
-                    value={state.studentId}
-                    onChange={(e) =>
-                      setState((prev) => ({ ...prev, studentId: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="fg">
-                  <label htmlFor="advisor">Advisor</label>
-                  <select
-                    id="advisor"
-                    value={state.advisor}
-                    onChange={(e) =>
-                      setState((prev) => ({ ...prev, advisor: e.target.value }))
-                    }
-                  >
-                    {ADVISORS.map((advisor) => (
-                      <option key={advisor} value={advisor}>
-                        {advisor}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
+            <div className="card timeline-card">
+              <h2 className="section-heading">Your timeline</h2>
               <div className="form-row">
                 <div className="fg">
                   <label htmlFor="planFromSem">Next semester</label>
@@ -738,7 +657,107 @@ export default function Planner() {
             </div>
 
             <div className="card">
-              <div className="sec-label">Curriculum version</div>
+              <div className="sec-label">Credits per semester</div>
+              <div className="info-row" style={{ marginBottom: 16 }}>
+                <span className="info-icon">💡</span>
+                <span>
+                  Default is <strong>8 credits/semester</strong>. You can push up
+                  to <strong>12 credits</strong>. Summer semesters are always
+                  capped at 2 credits.
+                </span>
+              </div>
+              <div className="cr-ctl">
+                <div className="cr-num">
+                  <div className="cr-big">{state.crLimit}</div>
+                  <div className="cr-lbl">cr/semester</div>
+                </div>
+                <div className="cr-slide-wrap">
+                  <input
+                    type="range"
+                    className="cr-range"
+                    aria-label="Credits per semester"
+                    min={4}
+                    max={12}
+                    step={1}
+                    value={state.crLimit}
+                    onChange={(e) =>
+                      setState((prev) => ({
+                        ...prev,
+                        crLimit: Number(e.target.value),
+                      }))
+                    }
+                  />
+                  <div className="cr-ticks">
+                    <span>4</span>
+                    <span>6</span>
+                    <span>8</span>
+                    <span>10</span>
+                    <span>12 (max)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <details className="card setup-details">
+              <summary><span>Proposal details</span><small>Name, student ID, and advisor for your Excel export</small></summary>
+              <div className="form-row">
+                <div className="fg">
+                  <label htmlFor="name">Name</label>
+                  <input
+                    id="name"
+                    type="text"
+                    value={state.name}
+                    onChange={(e) =>
+                      setState((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    placeholder="Your full name"
+                  />
+                </div>
+                <div className="fg">
+                  <label htmlFor="netId">NetID</label>
+                  <input
+                    id="netId"
+                    type="text"
+                    value={state.netId}
+                    onChange={(e) =>
+                      setState((prev) => ({ ...prev, netId: e.target.value }))
+                    }
+                    placeholder="Your NetID"
+                  />
+                </div>
+              </div>
+              <div className="form-row" style={{ marginTop: 16 }}>
+                <div className="fg">
+                  <label htmlFor="studentId">Student ID #</label>
+                  <input
+                    id="studentId"
+                    type="text"
+                    value={state.studentId}
+                    onChange={(e) =>
+                      setState((prev) => ({ ...prev, studentId: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="fg">
+                  <label htmlFor="advisor">Advisor</label>
+                  <select
+                    id="advisor"
+                    value={state.advisor}
+                    onChange={(e) =>
+                      setState((prev) => ({ ...prev, advisor: e.target.value }))
+                    }
+                  >
+                    {ADVISORS.map((advisor) => (
+                      <option key={advisor} value={advisor}>
+                        {advisor}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </details>
+
+            <details className="card setup-details">
+              <summary><span>Import a proposal</span><small>Optional · add course options from an existing spreadsheet</small></summary>
               <div className="info-row" style={{ marginBottom: 14 }}>
                 <span className="info-icon">📄</span>
                 <span>
@@ -778,58 +797,25 @@ export default function Planner() {
                   ⚠ {importError}
                 </div>
               )}
-            </div>
+            </details>
 
-            <div className="card">
-              <div className="sec-label">Credits per semester</div>
-              <div className="info-row" style={{ marginBottom: 16 }}>
-                <span className="info-icon">💡</span>
-                <span>
-                  Default is <strong>8 credits/semester</strong>. You can push up
-                  to <strong>12 credits</strong>. Summer semesters are always
-                  capped at 2 credits.
-                </span>
-              </div>
-              <div className="cr-ctl">
-                <div className="cr-num">
-                  <div className="cr-big">{state.crLimit}</div>
-                  <div className="cr-lbl">cr/semester</div>
-                </div>
-                <div className="cr-slide-wrap">
-                  <input
-                    type="range"
-                    className="cr-range"
-                    min={4}
-                    max={12}
-                    step={1}
-                    value={state.crLimit}
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        crLimit: Number(e.target.value),
-                      }))
-                    }
-                  />
-                  <div className="cr-ticks">
-                    <span>4</span>
-                    <span>6</span>
-                    <span>8</span>
-                    <span>10</span>
-                    <span>12 (max)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </section>
         )}
 
         {state.step === 2 && (
           <section className="step active">
-            <h1 className="step-title">What have you already completed?</h1>
+            <h1 className="step-title">Start with what you’ve done.</h1>
             <p className="step-sub">
-              Check every course you&apos;ve finished. Click the ▼ on any course
+              Check every course you&apos;ve finished. Use the + button on any course
               to read its description and details.
             </p>
+            <div className="course-search">
+              <label htmlFor="courseSearch">Find a course</label>
+              <div><input id="courseSearch" type="search" value={courseSearch} onChange={event => setCourseSearch(event.target.value)} placeholder="Search by name, code, or season…" />
+              {courseSearch && <button type="button" onClick={() => setCourseSearch('')}>Clear</button>}</div>
+              {courseSearch && <p role="status">Course selections are kept when you search.</p>}
+            </div>
+
             {takenSemOptions.length > 0 && (
               <div className="info-row excel-sem-note">
                 <span className="info-icon">📄</span>
@@ -863,6 +849,7 @@ export default function Planner() {
                 </div>
               )}
               <CourseList
+                search={courseSearch}
                 courses={reqForStep2}
                 inputType="checkbox"
                 name="taken-req"
@@ -882,6 +869,7 @@ export default function Planner() {
                 <span className="sec-note">(choose 1 — check if already done)</span>
               </div>
               <CourseList
+                search={courseSearch}
                 courses={OB}
                 inputType="checkbox"
                 name="taken-ob"
@@ -901,6 +889,7 @@ export default function Planner() {
                 <span className="sec-note">(check any already completed)</span>
               </div>
               <CourseList
+                search={courseSearch}
                 courses={EL}
                 inputType="checkbox"
                 name="taken-el"
@@ -917,6 +906,7 @@ export default function Planner() {
             <div className="card">
               <div className="sec-label">Residential &amp; Professional Development</div>
               <CourseList
+                search={courseSearch}
                 courses={[RES2, PD1, PD2]}
                 inputType="checkbox"
                 name="taken-res"
@@ -944,6 +934,7 @@ export default function Planner() {
                 </span>
               </div>
               <CourseList
+                search={courseSearch}
                 courses={LEGACY_COURSES}
                 inputType="checkbox"
                 name="taken-legacy"
@@ -1109,11 +1100,18 @@ export default function Planner() {
 
         {state.step === 3 && (
           <section className="step active">
-            <h1 className="step-title">Plan your remaining courses</h1>
+            <h1 className="step-title">Choose your next courses.</h1>
             <p className="step-sub">
               Select the courses you plan to take. Your choices will be scheduled
               into the right semesters automatically.
             </p>
+            <div className="course-search">
+              <label htmlFor="courseSearch">Find a course</label>
+              <div><input id="courseSearch" type="search" value={courseSearch} onChange={event => setCourseSearch(event.target.value)} placeholder="Search by name, code, or season…" />
+              {courseSearch && <button type="button" onClick={() => setCourseSearch('')}>Clear</button>}</div>
+              {courseSearch && <p role="status">Course selections are kept when you search.</p>}
+            </div>
+
 
             <div className="card">
               <div className="sec-label">Organizational Behavior — select 1</div>
@@ -1125,6 +1123,7 @@ export default function Planner() {
               ) : (
                 <>
                   <CourseList
+                    search={courseSearch}
                     courses={OB}
                     inputType="radio"
                     name="ob-choice"
@@ -1262,6 +1261,7 @@ export default function Planner() {
               )}
 
               <CourseList
+                search={courseSearch}
                 courses={filteredElectives}
                 inputType="checkbox"
                 name="el-choice"
@@ -1301,8 +1301,10 @@ export default function Planner() {
                 </div>
               ) : (
                 <div className="res-grid">
-                  <div
+                  <button
+                    type="button"
                     className={`res-opt ${state.resChoice === 'session2' ? 'sel' : ''}`}
+                    aria-pressed={state.resChoice === 'session2'}
                     onClick={() =>
                       setState((prev) => ({ ...prev, resChoice: 'session2' }))
                     }
@@ -1312,9 +1314,11 @@ export default function Planner() {
                       Attend a second on-campus immersive session (ENMGT 6002).
                     </div>
                     <div className="res-opt-cr">1 credit · Summer only</div>
-                  </div>
-                  <div
+                  </button>
+                  <button
+                    type="button"
                     className={`res-opt ${state.resChoice === 'workshops' ? 'sel' : ''}`}
+                    aria-pressed={state.resChoice === 'workshops'}
                     onClick={() =>
                       setState((prev) => ({ ...prev, resChoice: 'workshops' }))
                     }
@@ -1325,7 +1329,7 @@ export default function Planner() {
                       session.
                     </div>
                     <div className="res-opt-cr">{PD1.credits} + {PD2.credits} credits · 6010 in Fall, 6011 in Spring</div>
-                  </div>
+                  </button>
                 </div>
               )}
             </div>
@@ -1335,7 +1339,7 @@ export default function Planner() {
         {state.step === 4 && (
           <section className="step active">
             <div className="plan-header-row">
-              <h1 className="step-title">Your personalized course plan</h1>
+              <h1 className="step-title">Your degree, semester by semester.</h1>
               <div className="plan-actions">
                 <button
                   type="button"
@@ -1357,8 +1361,8 @@ export default function Planner() {
               </div>
             </div>
             <p className="step-sub">
-              Drag any course row to move it. Drop on a <strong>red + line</strong> to add, or on
-              another course to <strong>swap</strong>.
+              Drag a course to rearrange your plan, or open its details to choose another semester.
+              Only moves that meet the course rules and your credit limit are allowed.
             </p>
 
             {dragFeedback && (
@@ -1403,105 +1407,34 @@ export default function Planner() {
               </div>
             )}
 
-            {elExtraBeyondMin && (
-              <div className="alert alert-warn">
-                <span className="alert-icon">📚</span>
-                <div>
-                  Your plan includes <strong>{elTotal} specialization electives</strong>{' '}
-                  ({takenElCount} completed + {elPlannedCount} planned). The degree only
-                  requires {EL_MIN}. Extra electives add credits and workload — confirm
-                  that&apos;s intentional.
-                </div>
-              </div>
-            )}
-
             {plan.unscheduled.length > 0 && (
               <div className="alert alert-err">
                 <span className="alert-icon">⚠</span>
                 <div>
                   <strong>
-                    {plan.unscheduled.length} course(s) couldn&apos;t fit before
-                    your graduation date:
+                    {plan.unscheduled.length} course(s) remain unscheduled:
                   </strong>
                   {plan.unscheduled.map((course) => (
                     <div key={course.id}>
                       • {course.code} — {course.name}
+                      <p>{unscheduledReason(course, planner, plan)}</p>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {credits.total > 30 && creditOvershoot > 0 && (
-              <div className="alert alert-warn">
-                <span className="alert-icon">💰</span>
-                <div>
-                  Your plan is <strong>{credits.total} credits</strong> —{' '}
-                  <strong>{creditOvershoot} above</strong> the 30-credit minimum.
-                  {!state.returningStudent && (
-                    <>
-                      {' '}
-                      Incoming students must include the 3-credit ENMGT 5405 requirement.
-                      The degree minimum remains <strong>30 credits</strong>.
-                    </>
-                  )}
-                  {state.returningStudent && creditShortfall > 0 && (
-                    <>
-                      {' '}
-                      The 5930/5940 credit reductions mean you may need 1-cr or 1.5-cr
-                      makeup electives (e.g. ENMGT 6092, ENMGT 6095) — or pick a 3-cr +
-                      two 1.5-cr electives to land closer to 30.
-                    </>
-                  )}
-                  {state.returningStudent && creditShortfall === 0 && (
-                    <>
-                      {' '}
-                      With legacy 5930/5940 done, overshoot usually comes from
-                      3-credit-only electives — try 1.5-cr courses in Step 3 to get
-                      closer to 30.
-                    </>
-                  )}
-                  {' '}
-                  Deselect extra electives in Step 3 or drag courses to spread the load.
-                </div>
-              </div>
-            )}
-
-            {credits.total >= 30 && credits.total <= 31 && plan.unscheduled.length === 0 && (
-              <div className="alert alert-ok">
-                <span className="alert-icon">✓</span>
-                <div>
-                  Your plan totals <strong>{credits.total} credits</strong> — right at
-                  the 30-credit target.
-                </div>
-              </div>
-            )}
-
-            {credits.total >= 30 && credits.total > 31 && plan.unscheduled.length === 0 && skippedElectives.length === 0 && (
-              <div className="alert alert-ok">
-                <span className="alert-icon">✓</span>
-                <div>
-                  Your plan meets the 30-credit requirement with{' '}
-                  <strong>{credits.total} credits</strong> across your program.
-                </div>
-              </div>
-            )}
-
-            {credits.total < 30 && (
-              <div className="alert alert-warn">
-                <span className="alert-icon">📊</span>
-                <div>
-                  Your current plan totals <strong>{credits.total} credits</strong>{' '}
-                  — you need at least 30. Consider adding more electives in Step 3.
-                </div>
-              </div>
-            )}
-
+            {credits.total < 30 && <div className="alert alert-warn" role="status">
+              {plan.unscheduled.length > 0 && <span>{plan.unscheduled.reduce((sum, c) => sum + c.credits, 0)} credits are selected but unscheduled. Resolve their scheduling constraints first. </span>}
+              {credits.total + plan.unscheduled.reduce((sum, c) => sum + c.credits, 0) < 30
+                ? `Your selected courses still need ${30 - credits.total - plan.unscheduled.reduce((sum, c) => sum + c.credits, 0)} additional credits to reach 30.`
+                : 'Your selected courses reach 30 credits once all are scheduled.'}
+            </div>}
             <div className="plan-summary">
               <div className="credit-hero">
                 <div className="credit-num">{credits.total}</div>
                 <div>
-                  <div className="credit-lbl">total credits planned</div>
+                  <div className="credit-lbl">Total degree credits</div>
                   <div className="credit-sub">30 credits required for the MEM degree</div>
                 </div>
               </div>
@@ -1514,7 +1447,7 @@ export default function Planner() {
                 <span>30 minimum</span>
               </div>
               <div className="cr-plan-row">
-                <span className="cr-plan-lbl">Graduate by:</span>
+                <label htmlFor="gradSemPlan" className="cr-plan-lbl">Graduate by</label>
                 <select
                   id="gradSemPlan"
                   className="plan-grad-select"
@@ -1536,8 +1469,7 @@ export default function Planner() {
                   ))}
                 </select>
                 <span className="cr-plan-note">
-                  Change target graduation — e.g. Fall 2028 vs Spring 2028 — and the
-                  schedule updates automatically
+                  Changing this regenerates your schedule.
                 </span>
               </div>
               <div className="cr-plan-row">
@@ -1545,6 +1477,7 @@ export default function Planner() {
                 <div className="cr-stepper">
                   <button
                     className="cr-step-btn"
+                    aria-label="Decrease semester credit limit"
                     disabled={state.crLimit <= 4}
                     onClick={() =>
                       setState((prev) => ({
@@ -1559,6 +1492,7 @@ export default function Planner() {
                   <div className="cr-step-num">{state.crLimit}</div>
                   <button
                     className="cr-step-btn"
+                    aria-label="Increase semester credit limit"
                     disabled={state.crLimit >= 12}
                     onClick={() =>
                       setState((prev) => ({
@@ -1638,6 +1572,7 @@ export default function Planner() {
               </div>
             )}
 
+            <div className="semester-board">
             <PlanDragSurface
               plan={plan}
               planner={planner}
@@ -1649,6 +1584,7 @@ export default function Planner() {
               coachPulse={pulsePlanCards}
               onFeedback={handleDragFeedback}
             />
+            </div>
 
             {takenCourses.length === 0 &&
               state.customTaken.length === 0 &&
@@ -1661,9 +1597,11 @@ export default function Planner() {
           </section>
         )}
       </main>
+      </div>
 
       <div className="abar">
         <div className="abar-in">
+          <span className="action-progress">{state.step === 4 ? "Your semester plan" : `Step ${state.step} of 4 · ${STEPS[state.step - 1].label}`}</span>
           <button
             className="btn btn-ghost"
             style={{ visibility: state.step > 1 ? 'visible' : 'hidden' }}
@@ -1673,17 +1611,17 @@ export default function Planner() {
           </button>
           {state.step === 4 ? (
             <button className="btn btn-primary" onClick={recalculatePlan}>
-              Recalculate →
+              Reset arrangement
             </button>
           ) : (
             <button className="btn btn-primary" onClick={goNext}>
-              Continue →
+              {state.step === 3 ? 'Build my plan →' : 'Continue →'}
             </button>
           )}
         </div>
       </div>
 
-      <SiteFooter aboveActionBar />
+      <SiteFooter />
     </>
   )
 }

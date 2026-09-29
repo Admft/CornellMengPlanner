@@ -29,31 +29,20 @@ export function CourseListItem({
   const hasPrereqs = course.prereqs.length > 0
 
   return (
-    <div className={`citem ${expanded ? 'xpd' : ''}`}>
-      <div
-        className="ci-hdr"
-        onClick={(event) => {
-          const target = event.target as HTMLElement
-          if (target.matches('input, select, option')) return
-          if (target.closest('.ci-export-row')) return
-          onToggle()
-        }}
-      >
-        <input
-          type={inputType}
-          className={inputType === 'checkbox' ? 'ci-cb' : 'ci-rb'}
-          name={name}
-          value={course.id}
-          checked={checked}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-        <span className="ci-code">{course.code}</span>
-        <span className="ci-name">{course.name}</span>
-        {course.legacy && <span className="legacy-pill">previous curriculum</span>}
-        {hasPrereqs && <span className="prereq-pill">prereqs req.</span>}
-        <span className="ci-season">{course.seasons.join(' / ')}</span>
-        <span className="ci-cr">{course.credits} cr</span>
-        <span className="ci-chev">▼</span>
+    <div className={`citem ${expanded ? 'xpd' : ''} ${checked ? 'selected' : ''}`}>
+      <div className="ci-hdr">
+        <label className="ci-selection">
+          <input type={inputType} className={inputType === 'checkbox' ? 'ci-cb' : 'ci-rb'}
+            name={name} value={course.id} checked={checked}
+            aria-label={`${course.code}: ${course.name}`}
+            onChange={event => onChange(event.target.checked)} />
+          <span className="ci-title"><span className="ci-code">{course.code}</span><span className="ci-name">{course.name}</span></span>
+        </label>
+        <span className="ci-metadata"><span className="ci-season">{course.seasons.join(' / ')}</span><span className="ci-cr">{course.credits} cr</span></span>
+        <button type="button" className="course-expand" aria-expanded={expanded}
+          aria-label={`${expanded ? 'Hide' : 'Show'} details for ${course.code}`} onClick={onToggle}>
+          <span aria-hidden="true">{expanded ? '−' : '+'}</span>
+        </button>
       </div>
       {checked && onTakenSemChange && takenSemOptions && takenSemOptions.length > 0 && (
         <div
@@ -83,6 +72,7 @@ export function CourseListItem({
         </div>
       )}
       <div className="ci-body">
+        {course.legacy && <span className="legacy-pill">Previous curriculum</span>}
         <p className="ci-desc">{course.desc}</p>
         <p className="ci-notes">{course.notes}</p>
         {hasPrereqs && (
@@ -107,6 +97,8 @@ interface PlanCardProps {
   swapInvalid?: boolean
   swapStrip?: string
   showSwapChip?: boolean
+  moveTargets?: { code: string; label: string }[]
+  onMove?: (semCode: string) => void
 }
 
 export function PlanInsertSlot({
@@ -153,6 +145,8 @@ export function PlanCard({
   swapInvalid = false,
   swapStrip,
   showSwapChip = false,
+  moveTargets,
+  onMove,
 }: PlanCardProps) {
   const catClass =
     course.cat === 'req' || course.cat === 'cap'
@@ -191,7 +185,15 @@ export function PlanCard({
     >
       <div
         className="pc-hdr"
-        onPointerDown={onDragPointerDown}
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={`${course.code}: ${course.name}, ${course.credits} credits. ${expanded ? 'Hide' : 'Show'} details`}
+        onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onToggle() } }}
+        onPointerDown={event => {
+          if (event.pointerType === 'touch' && !(event.target as HTMLElement).closest('.pc-drag')) return
+          onDragPointerDown?.(event)
+        }}
         onClick={() => {
           if (skipToggleRef?.current) {
             skipToggleRef.current = false
@@ -222,6 +224,13 @@ export function PlanCard({
         </div>
       )}
       <div className="pc-body">
+        {onMove && moveTargets && <label className="course-move-label">
+          Move to semester
+          <select aria-label={`Move ${course.code} to semester`} value={semCode} onChange={event => onMove(event.target.value)}>
+            {moveTargets.map(semester => <option key={semester.code} value={semester.code}>{semester.label}</option>)}
+          </select>
+          <small>Only semesters that fit the course rules and your credit limit are listed.</small>
+        </label>}
         <p>{course.desc}</p>
         <p>{course.notes}</p>
         {course.prereqs.length > 0 && (

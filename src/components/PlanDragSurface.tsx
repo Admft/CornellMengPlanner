@@ -400,11 +400,24 @@ export default function PlanDragSurface({
                   hover.semCode === sem.code &&
                   hover.courseId === course.id
                 const swapInvalid = swapHover && !swapCheck.ok
+                const moveOptions = planExpanded.has(`${sem.code}-${course.id}`)
+                  ? validMoveSemesters(course, sem.code, plan.sems, plan, planner) : null
                 return (
                   <PlanCard
                     key={course.id}
                     course={course}
                     semCode={sem.code}
+                    moveTargets={moveOptions
+                      ? plan.sems.filter(target => moveOptions.has(target.code))
+                      : undefined}
+                    onMove={targetCode => {
+                      const target = plan.sems.find(s => s.code === targetCode)
+                      if (!target || targetCode === sem.code) return
+                      const check = canPlaceCourse(course, target, plan.sems, plan.plan, planner, { fromSemCode: sem.code })
+                      if (!check.ok) { onFeedback(check.reason, 'warn'); return }
+                      onLayoutChange(moveCourseInLayout(layout, course.id, sem.code, targetCode))
+                      onFeedback(`Moved ${course.code} to ${target.label}.`, 'ok')
+                    }}
                     expanded={planExpanded.has(`${sem.code}-${course.id}`)}
                     onToggle={() => onToggleExpanded(`${sem.code}-${course.id}`)}
                     isDragging={drag?.courseId === course.id && drag.fromSem === sem.code}
