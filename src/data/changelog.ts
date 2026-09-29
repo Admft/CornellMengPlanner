@@ -12,13 +12,57 @@ export interface ChangelogRelease {
 }
 
 /** Bump this date when you ship user-visible changes; drives the “what’s new” banner. */
-export const LATEST_VERSION = '2026-07-01'
+export const LATEST_VERSION = '2026-09-29'
 
 const SEEN_STORAGE_KEY = 'mem-planner-changelog-seen'
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
     version: LATEST_VERSION,
+    label: 'September 29, 2026',
+    summary: 'A redesigned planner, smarter semester scheduling, updated DL capstone guidance, and corrected Excel proposals.',
+    sections: [
+      {
+        title: 'A clearer planning experience',
+        items: [
+          'New Cornell red design, step navigation, and layouts for desktop and phones.',
+          'Search courses by name, code, or season; open course details separately from selecting a course.',
+          'Review semesters side by side on desktop and in a single column on phones.',
+          'Move courses with drag-and-drop or choose a valid semester from the course details.',
+        ],
+      },
+      {
+        title: 'Smarter schedules',
+        items: [
+          'The planner searches alternative arrangements and earlier completion dates within your graduation target, instead of relying only on filling semesters in order.',
+          'Elective selection considers semester availability as well as credits, using only the electives you selected.',
+          'Seasonal offerings repeat annually for planning unless an explicit course update limits availability.',
+          'Moves and swaps check the resulting schedule against course offerings, credit limits, and applicable prerequisites.',
+          'Warnings distinguish selected but unscheduled credits from additional credits you still need. The bounded search does not guarantee an optimal solution for every plan.',
+        ],
+      },
+      {
+        title: 'Updated Distance Learning guidance',
+        items: [
+          'The capstone may be taken alongside other courses. The DL program recommends the last or second-to-last semester and suggests Project Management beforehand; these are recommendations rather than scheduling blocks.',
+          'Removed the older capstone prerequisite and final-semester-only restrictions following clarification from the DL program.',
+          'Current Data Analytics is 3 credits; completed legacy coursework retains its original credits. Completed Economics and Finance satisfies the replacement economics courses.',
+          'Applied AI for Technical Teams is optional for returning students who matriculated before Summer 2026, excluding early admits. Select returning-student status in the timeline step when applicable.',
+          'Professional Development uses ENMGT 6010 in Fall and ENMGT 6011 in Spring. Managing a Culture of Innovation can count as Organizational Behavior or an elective, once.',
+        ],
+      },
+      {
+        title: 'Excel proposal fixes',
+        items: [
+          'Exports use actual semester headings and place credits in the correct course sections, including legacy and custom completed courses.',
+          'Corrected totals, recalculating formulas, and seasonal cell formatting in the updated proposal template.',
+          'Export validation catches missing requirements, duplicate course credit, and courses outside the template range.',
+        ],
+      },
+    ],
+  },
+  {
+    version: '2026-07-01',
     label: 'July 1, 2026',
     summary:
       'Plan starts when you say it does, and drag-and-drop on the schedule is rebuilt to be clearer and actually work.',
