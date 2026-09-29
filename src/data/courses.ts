@@ -1,4 +1,5 @@
-import type { Course, CurriculumCatalog, Season } from '../types'
+import type { Course, CurriculumCatalog, Season, Semester } from '../types'
+import { semIdx } from './semesters'
 
 export const DEFAULT_CURRICULUM: CurriculumCatalog = {
   req: [
@@ -56,6 +57,7 @@ export const DEFAULT_CURRICULUM: CurriculumCatalog = {
     },
     {
       id: 'EN5941',
+      availableFrom: 'SP27',
       code: 'ENMGT 5941',
       name: 'Foundations in Engineering Economics',
       credits: 1.5,
@@ -69,6 +71,7 @@ export const DEFAULT_CURRICULUM: CurriculumCatalog = {
     },
     {
       id: 'EN5942',
+      availableFrom: 'SP27',
       code: 'ENMGT 5942',
       name: 'Applied Engineering Economics',
       credits: 1.5,
@@ -95,6 +98,7 @@ export const DEFAULT_CURRICULUM: CurriculumCatalog = {
     },
     {
       id: 'EN5405',
+      availableFrom: 'FA26',
       code: 'ENMGT 5405',
       name: 'Applied AI for Technical Teams',
       credits: 3,
@@ -157,7 +161,7 @@ export const DEFAULT_CURRICULUM: CurriculumCatalog = {
       cat: 'org',
       pri: 2,
       desc: 'Building and sustaining innovative cultures, managing creative teams, fostering intrapreneurship, and leading organizational change in engineering firms.',
-      notes: 'Offered Fall only.',
+      notes: 'Fall; counts as either Organizational Behavior or an elective, once only. Program email: Kabeh Vaziri; synchronous DL time TBD.',
       excelRow: 31,
     },
     {
@@ -250,7 +254,7 @@ export const DEFAULT_CURRICULUM: CurriculumCatalog = {
       cat: 'el',
       pri: 4,
       desc: 'Frameworks for generating business value from AI investments, including ROI measurement, strategic positioning, and managing AI product portfolios.',
-      notes: 'Offered Spring only.',
+      notes: 'Spring 2027 confirmed by the program email; assumed to recur each Spring. Taught by Kabeh Vaziri.',
       excelRow: 41,
     },
     {
@@ -350,12 +354,12 @@ export const DEFAULT_CURRICULUM: CurriculumCatalog = {
     code: 'ENMGT 6010',
     name: 'Professional Development Workshop I',
     credits: 0.5,
-    seasons: ['Fall', 'Spring'],
+    seasons: ['Fall'],
     prereqs: [],
     cat: 'res',
     pri: 1,
     desc: 'Professional skills for engineering managers: communication, career management, executive presence.',
-    notes: 'Fall and Spring. Take with ENMGT 6011 as an alternative to Residential Session II.',
+    notes: 'Fall only. Take with ENMGT 6011 as an alternative to Residential Session II.',
     excelRow: 23,
   },
   pd2: {
@@ -363,14 +367,29 @@ export const DEFAULT_CURRICULUM: CurriculumCatalog = {
     code: 'ENMGT 6011',
     name: 'Professional Development Workshop II',
     credits: 0.5,
-    seasons: ['Fall', 'Spring'],
+    seasons: ['Spring'],
     prereqs: [],
     cat: 'res',
     pri: 1,
     desc: 'Advanced professional development: negotiation, networking, and leadership brand for engineering managers.',
-    notes: 'Fall and Spring. Take with ENMGT 6010 as an alternative to Residential Session II.',
+    notes: 'Spring only. Take with ENMGT 6010 as an alternative to Residential Session II.',
     excelRow: 24,
   },
+}
+
+// Program email updates override older proposal-template comments.
+DEFAULT_CURRICULUM.el.push({
+  ...DEFAULT_CURRICULUM.ob.find(c => c.id === 'EN6020')!,
+  id: 'EN6020el', cat: 'el', pri: 4, excelRow: 48,
+})
+DEFAULT_CURRICULUM.el.push({
+  ...DEFAULT_CURRICULUM.req.find(c => c.id === 'EN5405')!,
+  id: 'EN5405el', cat: 'el', pri: 4, excelRow: undefined,
+  notes: 'Fall. Optional elective for returning students; required for incoming students. Counts once.',
+})
+
+export function courseKey(course: Pick<Course, 'code'>): string {
+  return course.code.replace(/\s*\(.*/, '').trim()
 }
 
 export function catalogToList(catalog: CurriculumCatalog): Course[] {
@@ -409,8 +428,8 @@ export function analyticsRequirementMet(taken: Set<string>): boolean {
  */
 export function curriculumCreditShortfall(taken: Set<string>): number {
   let shortfall = 0
-  if (!analyticsRequirementMet(taken)) shortfall += 1
-  if (!economicsRequirementMet(taken)) shortfall += 1
+  if (!taken.has('EN5930_legacy')) shortfall += 1
+  if (!taken.has('EN5940')) shortfall += 1
   return shortfall
 }
 
@@ -421,6 +440,8 @@ export function isCourseCompleted(
   ctx?: CompletionContext,
 ): boolean {
   if (taken.has(id)) return true
+  const baseId = id.replace(/el$/, '')
+  if (taken.has(baseId) || taken.has(`${baseId}el`)) return true
   if (id === 'EN5930' && taken.has('EN5930_legacy')) return true
   if ((id === 'EN5941' || id === 'EN5942') && economicsRequirementMet(taken)) return true
   // ENMGT 5405 (email: 5404) — incoming-only requirement; returning students waived
@@ -441,4 +462,10 @@ export function hasWorkshopsDone(taken: Set<string>): boolean {
     (taken.has('EN6010') && taken.has('EN6011')) ||
     (taken.has('EN6011') && taken.has('EN6012'))
   )
+}
+
+/** Seasonal recurrence is a planning assumption; explicit start dates take precedence. */
+export function isOfferedIn(course: Course, semester: Semester): boolean {
+  return course.seasons.includes(semester.season) &&
+    (!course.availableFrom || semIdx(semester.code) >= semIdx(course.availableFrom))
 }

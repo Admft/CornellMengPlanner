@@ -1,5 +1,7 @@
 import {
   catalogToList,
+  courseKey,
+  isOfferedIn,
   getCourseById,
   hasWorkshopsDone,
   isCourseCompleted,
@@ -42,7 +44,7 @@ function takenCredits(state: PlannerState): number {
 }
 
 function takenElectiveCount(state: PlannerState): number {
-  return state.curriculum.el.filter((c) => state.taken.has(c.id)).length
+  return state.curriculum.el.filter((c) => state.taken.has(c.id)).length + state.customTaken.filter(c => c.cat === 'el').length
 }
 
 function completionCtx(state: PlannerState) {
@@ -59,14 +61,16 @@ function nonElectiveQueue(state: PlannerState): Course[] {
     if (!isCourseCompleted(course.id, done, ctx)) queue.push({ ...course })
   })
 
-  if (state.resChoice === 'session2') {
+  if (hasWorkshopsDone(done) || done.has(curriculum.res2.id)) {
+    // Either completed pathway satisfies the requirement.
+  } else if (state.resChoice === 'session2') {
     if (!isCourseCompleted(curriculum.res2.id, done, ctx)) queue.push({ ...curriculum.res2 })
   } else {
     if (!isCourseCompleted(curriculum.pd1.id, done, ctx)) queue.push({ ...curriculum.pd1 })
     if (!isCourseCompleted(curriculum.pd2.id, done, ctx)) queue.push({ ...curriculum.pd2 })
   }
 
-  if (state.obChoice && !isCourseCompleted(state.obChoice, done, ctx)) {
+  if (!curriculum.ob.some(c => done.has(c.id)) && state.obChoice && !isCourseCompleted(state.obChoice, done, ctx)) {
     const ob = curriculum.ob.find((course) => course.id === state.obChoice)
     if (ob) queue.push({ ...ob })
   }
@@ -131,7 +135,8 @@ function buildQueue(state: PlannerState): Course[] {
   state.elChoices.forEach((courseId) => {
     if (!isCourseCompleted(courseId, done, ctx)) {
       const elective = state.curriculum.el.find((course) => course.id === courseId)
-      if (elective) electiveCandidates.push({ ...elective })
+      if (elective && !queue.some(c => courseKey(c) === courseKey(elective)) &&
+          ![...done].some(id => { const c = resolveCourse(id, state.curriculum); return c && courseKey(c) === courseKey(elective) })) electiveCandidates.push({ ...elective })
     }
   })
 
@@ -178,7 +183,7 @@ export function generatePlan(state: PlannerState): GeneratedPlan {
     const available = queue
       .filter(
         (course) =>
-          course.seasons.includes(sem.season) &&
+          isOfferedIn(course, sem) &&
           prereqsSatisfied(course.prereqs ?? [], done, ctx),
       )
       .sort((a, b) => a.pri - b.pri || a.credits - b.credits)
@@ -246,7 +251,7 @@ export function getAllPlacements(
             })
 
       const matchedSem = autoSems.find((sem) => {
-        if (!course.seasons.includes(sem.season)) return false
+        if (!isOfferedIn(course, sem)) return false
         if (!prereqsSatisfied(course.prereqs ?? [], done, completionCtx(state))) return false
         const load = semLoads.get(sem.code) ?? 0
         const limit = limits[sem.season] ?? 12
@@ -270,8 +275,8 @@ export function getAllPlacements(
     }
   }
 
-  for (const sem of excelSems) {
-    const semPlan = plan[sem.code]
+  for (const semPlan of Object.values(plan)) {
+    const sem = semPlan.sem
     if (!semPlan) continue
     const semIndex = excelSems.findIndex((item) => item.code === sem.code)
     for (const course of semPlan.courses) {

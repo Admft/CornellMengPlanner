@@ -104,11 +104,11 @@ export function autoPlaceSemesters(programStart: string, planFrom: string): Seme
   const startIdx = semIdx(start)
   const planIdx = semIdx(planFrom)
   if (startIdx < 0 || planIdx < 0) return []
-  return SEMS.slice(startIdx, planIdx + 1)
+  return SEMS.slice(startIdx, planIdx)
 }
 
-/** Cornell template row 12 labels: E=SU1, F=FA1, G=SP1, H=SU2, … */
-const TEMPLATE_SEASON_ORDER: Semester['season'][] = ['Summer', 'Fall', 'Spring']
+/** Export columns begin at the actual program start; the exporter writes term labels. */
+
 
 export function excelSemesters(
   programStart: string,
@@ -121,17 +121,8 @@ export function excelSemesters(
   const gradIdx = semIdx(grad)
   if (startIdx < 0 || gradIdx < 0) return []
 
-  const startSeasonIdx = TEMPLATE_SEASON_ORDER.indexOf(SEMS[startIdx].season)
-  if (startSeasonIdx < 0) return []
-
-  const result: Semester[] = []
-  for (let t = 0; t < maxCols; t++) {
-    const calIdx = startIdx + (t - startSeasonIdx)
-    if (calIdx < 0 || calIdx >= SEMS.length) break
-    const sem = SEMS[calIdx]
-    if (semIdx(sem.code) > gradIdx) break
-    result.push(sem)
-  }
+  if (gradIdx < startIdx) return []
+  const result = SEMS.slice(startIdx, Math.min(gradIdx + 1, startIdx + maxCols))
   return result
 }
 

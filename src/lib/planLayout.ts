@@ -1,5 +1,6 @@
 import {
   getCourseById,
+  isOfferedIn,
   prereqsSatisfied,
   type CompletionContext,
 } from '../data/courses'
@@ -93,10 +94,10 @@ function canPlaceInLayout(
   const targetIdx = sems.findIndex((s) => s.code === targetSem.code)
   if (targetIdx < 0) return { ok: false, reason: 'Invalid semester.' }
 
-  if (!course.seasons.includes(targetSem.season)) {
+  if (!isOfferedIn(course, targetSem)) {
     return {
       ok: false,
-      reason: `${course.code} is only offered in ${course.seasons.join(', ')}.`,
+      reason: `${course.code} is only offered in ${course.seasons.join(', ')}${course.availableFrom ? ` from ${course.availableFrom} onward` : ''}.`,
     }
   }
 
@@ -121,6 +122,25 @@ function canPlaceInLayout(
   return { ok: true }
 }
 
+/** Validate the whole candidate schedule, including dependents of moved courses. */
+export function validateLayout(
+  layout: Record<string, string[]>, sems: Semester[], state: PlannerState,
+): { ok: true } | { ok: false; reason: string } {
+  const seen = new Set<string>()
+  for (const sem of sems) {
+    for (const id of layout[sem.code] ?? []) {
+      const course = resolveCourse(id, state.curriculum)
+      if (!course) return { ok: false, reason: `Unknown course: ${id}.` }
+      const key = course.code.replace(/\s*\(.*/, '').trim()
+      if (seen.has(key)) return { ok: false, reason: `${key} cannot count twice.` }
+      seen.add(key)
+      const check = canPlaceInLayout(course, sem, layout, sems, state)
+      if (!check.ok) return check
+    }
+  }
+  return { ok: true }
+}
+
 export function canPlaceCourse(
   course: Course,
   targetSem: Semester,
@@ -140,7 +160,7 @@ export function canPlaceCourse(
     layout[targetSem.code] = [...(layout[targetSem.code] ?? []), course.id]
   }
 
-  return canPlaceInLayout(course, targetSem, layout, sems, state)
+  return validateLayout(layout, sems, state)
 }
 
 export function canSwapCourses(
@@ -173,7 +193,7 @@ export function canSwapCourses(
   const checkB = canPlaceInLayout(courseB, semA, next, sems, state)
   if (!checkB.ok) return checkB
 
-  return { ok: true }
+  return validateLayout(next, sems, state)
 }
 
 export function swapCoursesInLayout(

@@ -173,6 +173,7 @@ export default function Planner() {
   const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  const [exportSuccess, setExportSuccess] = useState(false)
   const [importError, setImportError] = useState('')
   const [importing, setImporting] = useState(false)
   const [showFeatureRequest, setShowFeatureRequest] = useState(false)
@@ -218,7 +219,10 @@ export default function Planner() {
   const skippedElectives = useMemo(() => getSkippedElectives(planner), [planner])
   const plan = useMemo(() => {
     if (!state.planLayout) return basePlan
-    return layoutToPlan(state.planLayout, basePlan.sems, state.curriculum)
+    const edited = layoutToPlan(state.planLayout, basePlan.sems, state.curriculum)
+    const scheduled = new Set(Object.values(edited.plan).flatMap(s => s.courses.map(c => c.id)))
+    edited.unscheduled = [...basePlan.unscheduled, ...edited.unscheduled].filter(c => !scheduled.has(c.id))
+    return edited
   }, [basePlan, state.planLayout, state.curriculum])
   const credits = useMemo(() => getCreditTotals(planner, plan), [planner, plan])
   const planSemesterOptions = useMemo(() => planningSemesters(), [])
@@ -236,7 +240,7 @@ export default function Planner() {
   const elSet = useMemo(() => new Set(state.elChoices), [state.elChoices])
 
   const takenOB = OB.filter((course) => takenSet.has(course.id))
-  const takenElCount = EL.filter((course) => takenSet.has(course.id)).length
+  const takenElCount = EL.filter((course) => takenSet.has(course.id)).length + state.customTaken.filter(c => c.cat === 'el').length
   const elPlannedCount = state.elChoices.length
   const elStillNeeded = Math.max(0, EL_MIN - takenElCount)
   const elTotal = takenElCount + elPlannedCount
@@ -279,6 +283,10 @@ export default function Planner() {
         taken = taken.filter((item) => item !== 'EN5930_legacy')
       }
 
+      if (checked) {
+        const selected = ALL_COURSES.find(c => c.id === id)
+        if (selected) taken = taken.filter(other => other === id || ALL_COURSES.find(c => c.id === other)?.code !== selected.code)
+      }
       const takenSemesters = { ...prev.takenSemesters }
       if (!checked) {
         delete takenSemesters[id]
@@ -309,8 +317,9 @@ export default function Planner() {
 
   const filteredElectives = EL.filter((course) => {
     if (takenSet.has(course.id)) return false
-    if (state.obChoice === 'EN5300' && course.id === 'EN5300el') return false
-    if (state.obChoice === 'EN6030' && course.id === 'EN6030el') return false
+    if (course.id === `${state.obChoice}el`) return false
+    if (course.id === 'EN5405el' && !state.returningStudent) return false
+    if (takenSet.has(course.id.replace(/el$/, ''))) return false
     return true
   })
 
@@ -349,6 +358,7 @@ export default function Planner() {
         ...prev,
         curriculum: catalog,
         curriculumImported: true,
+        planLayout: null,
         obChoice: catalog.ob.some((c) => c.id === prev.obChoice) ? prev.obChoice : '',
         elChoices: prev.elChoices.filter((id) => catalog.el.some((c) => c.id === id)),
       }))
@@ -455,6 +465,7 @@ export default function Planner() {
 
   async function handleExport() {
     setExportError('')
+    setExportSuccess(false)
     const validation = validateScheduleForExport(planner, plan)
     if (!validation.ok) {
       setExportError(validation.errors.join(' '))
@@ -464,6 +475,7 @@ export default function Planner() {
     setExporting(true)
     try {
       await exportProposalExcel(planner, proposalTemplateRef.current, plan)
+      setExportSuccess(true)
       void recordExcelExport()
     } catch (error) {
       setExportError(
@@ -645,7 +657,7 @@ export default function Planner() {
                     id="gradSem"
                     value={state.gradSem}
                     onChange={(e) =>
-                      setState((prev) => ({ ...prev, gradSem: e.target.value }))
+                      setState((prev) => ({ ...prev, gradSem: e.target.value, planLayout: null }))
                     }
                   >
                     {gradSemesterOptions.map((sem) => (
@@ -692,7 +704,7 @@ export default function Planner() {
             <div className="info-row">
               <span className="info-icon">📋</span>
               <span>
-                The MEM program requires a minimum of <strong>30 credits</strong>.
+                Seasonal offerings repeat each year for planning unless an explicit update says otherwise. The MEM program requires a minimum of <strong>30 credits</strong>.
                 Most students complete it in 4–6 semesters (about 2 years).
               </span>
             </div>
@@ -712,13 +724,13 @@ export default function Planner() {
                   }
                 />
                 <span>
-                  <strong>Returning student</strong> (matriculated before Summer 2026)
+                  <strong>Returning student</strong> (matriculated before Summer 2026, excluding early admits)
                 </span>
               </label>
               <p className="returning-note">
                 Per Cornell&apos;s Fall 2026 curriculum update: returning students are{' '}
                 <strong>not required</strong> to take ENMGT 5405 Applied AI (the email
-                lists 5404 — same new AI requirement). Incoming students must take it.
+                lists 5404; the template and current Cornell roster list 5405). Incoming students and early admits must take it.
                 If you already completed ENMGT 5930 (Data Analytics) and ENMGT 5940
                 (Economics and Finance for Engineering Management), mark those in Step 2
                 and the split/credit changes don&apos;t apply to you.
@@ -730,9 +742,9 @@ export default function Planner() {
               <div className="info-row" style={{ marginBottom: 14 }}>
                 <span className="info-icon">📄</span>
                 <span>
-                  Cornell updates the course list most semesters. If you received a
-                  newer proposal spreadsheet, import it here to load the latest
-                  classes. Otherwise the current curriculum is already loaded.
+                  Import a proposal spreadsheet to add course options. Known courses
+                  follow the Summer 2026 template and the supplied program updates.
+                  Historical completions export on the updated proposal form.
                 </span>
               </div>
               <div className="import-row">
@@ -1070,7 +1082,7 @@ export default function Planner() {
                 <div className="fg fg-narrow">
                   <label htmlFor="customSem">
                     Which semester?{' '}
-                    <span className="sec-note">(Excel only · optional)</span>
+                    <span className="sec-note">(required for Excel export)</span>
                   </label>
                   <select
                     id="customSem"
@@ -1123,6 +1135,8 @@ export default function Planner() {
                       setState((prev) => ({
                         ...prev,
                         obChoice: checked ? id : prev.obChoice,
+                        elChoices: prev.elChoices.filter(el => el !== `${id}el`),
+                        planLayout: null,
                       }))
                     }
                   />
@@ -1310,7 +1324,7 @@ export default function Planner() {
                       Take {PD1.code} + {PD2.code} instead of the residential
                       session.
                     </div>
-                    <div className="res-opt-cr">{PD1.credits} + {PD2.credits} credits · Fall or Spring</div>
+                    <div className="res-opt-cr">{PD1.credits} + {PD2.credits} credits · 6010 in Fall, 6011 in Spring</div>
                   </div>
                 </div>
               )}
@@ -1381,6 +1395,7 @@ export default function Planner() {
               </div>
             )}
 
+            {exportSuccess && <p role="status">Excel file created. Check your browser downloads.</p>}
             {exportError && (
               <div className="alert alert-err">
                 <span className="alert-icon">⚠</span>
@@ -1426,8 +1441,8 @@ export default function Planner() {
                   {!state.returningStudent && (
                     <>
                       {' '}
-                      Incoming students must take ENMGT 5405 (+3 cr), so the core
-                      curriculum is often <strong>32+ credits</strong> before electives.
+                      Incoming students must include the 3-credit ENMGT 5405 requirement.
+                      The degree minimum remains <strong>30 credits</strong>.
                     </>
                   )}
                   {state.returningStudent && creditShortfall > 0 && (

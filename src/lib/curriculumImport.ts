@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs'
+import { DEFAULT_CURRICULUM } from '../data/courses'
 import type { Course, CourseCategory, CurriculumCatalog, Season } from '../types'
 
 type Section = 'req' | 'ob' | 'el'
@@ -201,7 +202,14 @@ export async function importCurriculumFromXlsx(
   }
 
   return {
-    catalog: { req, ob, el, res2, pd1, pd2 },
+    // Historical files are evidence of completed credits, not future requirements.
+    // Keep the current known curriculum and preserve any additional imported options.
+    catalog: {
+      ...DEFAULT_CURRICULUM,
+      req: [...DEFAULT_CURRICULUM.req, ...req.filter(c => !DEFAULT_CURRICULUM.req.some(d => d.id === c.id) && c.id !== 'EN5940')],
+      ob: [...DEFAULT_CURRICULUM.ob, ...ob.filter(c => !DEFAULT_CURRICULUM.ob.some(d => d.id === c.id))],
+      el: [...DEFAULT_CURRICULUM.el, ...el.filter(c => !DEFAULT_CURRICULUM.el.some(d => d.id === c.id))],
+    },
     courseRows,
   }
 }

@@ -7,6 +7,7 @@ export interface Course {
   name: string
   credits: number
   seasons: Season[]
+  availableFrom?: string
   prereqs: string[]
   cat: CourseCategory
   pri: number
@@ -123,5 +124,5 @@ export const DEFAULT_STATE: Omit<PlannerState, 'curriculum' | 'planFromSem'> & {
   elChoices: new Set(),
   resChoice: 'session2',
   customTaken: [],
-  returningStudent: true,
+  returningStudent: false,
 }

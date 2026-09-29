@@ -161,6 +161,7 @@ export default function PlanDragSurface({
       )
       if (!moveCheck.ok) {
         onFeedback(moveCheck.reason, 'warn')
+        finishDrag()
         return
       }
 
@@ -192,6 +193,7 @@ export default function PlanDragSurface({
       )
       if (!check.ok) {
         onFeedback(check.reason, 'warn')
+        finishDrag()
         return
       }
 
@@ -300,10 +302,12 @@ export default function PlanDragSurface({
 
     document.addEventListener('pointermove', onPointerMove)
     document.addEventListener('pointerup', onPointerUp)
+    document.addEventListener('pointercancel', finishDrag)
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('pointermove', onPointerMove)
       document.removeEventListener('pointerup', onPointerUp)
+      document.removeEventListener('pointercancel', finishDrag)
       document.removeEventListener('keydown', onKeyDown)
     }
   }, [curriculum, validMoveSems, applyMove, applySwap, finishDrag, onFeedback])
@@ -343,7 +347,7 @@ export default function PlanDragSurface({
         </div>
       )}
 
-      {hover?.kind === 'swap' && draggedCourse && (
+      {hover?.kind === 'swap' && draggedCourse && validSwapKeys.has(`${hover.semCode}:${hover.courseId}`) && (
         <div className="plan-drag-feedback plan-drag-feedback-floating">
           <div className="alert alert-ok plan-swap-hint">
             <span className="alert-icon">⇄</span>
@@ -367,7 +371,7 @@ export default function PlanDragSurface({
 
       {plan.sems.map((sem) => {
         const semPlan = plan.plan[sem.code]
-        if (!semPlan || semPlan.courses.length === 0) return null
+        if (!semPlan) return null
         const borderClass = `${seasonKey(sem.season)}-border`
         const pillClass = seasonKey(sem.season)
         const canMoveHere =
@@ -386,6 +390,7 @@ export default function PlanDragSurface({
             <div
               className={`sem-body sem-body-drag ${borderClass} ${canMoveHere ? 'sem-drop-valid' : ''} ${isInvalid ? 'sem-drop-invalid' : ''}`}
             >
+              {semPlan.courses.length === 0 && <p className="sec-note">No courses planned. Drag an eligible course here.</p>}
               {semPlan.courses.map((course) => {
                 const swapKey = `${sem.code}:${course.id}`
                 const swapAvailable = validSwapKeys.has(swapKey)
